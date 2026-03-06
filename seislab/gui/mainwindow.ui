@@ -1,0 +1,1804 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SeisLabMainWindow</class>
+ <widget class="QMainWindow" name="SeisLabMainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1920</width>
+    <height>1060</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>1280</width>
+    <height>720</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>SeisLab Pro  ·  Seismic Analysis &amp; Interpretation Workstation</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">
+* {
+    font-family: &quot;Segoe UI&quot;, Arial, sans-serif;
+    font-size: 12px;
+    color: #222222;
+}
+QMainWindow, QWidget { background-color: #ececec; }
+QMenuBar, QStatusBar {
+    background-color: #f4f4f4;
+    border: 1px solid #c7c7c7;
+}
+QMenu {
+    background-color: #ffffff;
+    border: 1px solid #c7c7c7;
+}
+QToolBar {
+    background-color: #f8f8f8;
+    border: 1px solid #c7c7c7;
+}
+QTabWidget::pane, QTreeWidget, QTableWidget {
+    background: #ffffff;
+    border: 1px solid #c9c9c9;
+}
+QTabBar::tab {
+    background: #e4e4e4;
+    border: 1px solid #bdbdbd;
+    padding: 6px 12px;
+    margin-right: 2px;
+}
+QTabBar::tab:selected {
+    background: #ffffff;
+    border-bottom-color: #ffffff;
+}
+QGroupBox {
+    border: 1px solid #bdbdbd;
+    border-radius: 3px;
+    margin-top: 10px;
+    padding-top: 10px;
+    background: #f8f8f8;
+    font-weight: 700;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 4px;
+    color: #404040;
+}
+QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit {
+    background: #ffffff;
+    border: 1px solid #b8b8b8;
+    border-radius: 3px;
+    padding: 4px;
+}
+QPushButton {
+    background-color: #d9e5ef;
+    border: 1px solid #94adc5;
+    border-radius: 2px;
+    padding: 6px 10px;
+    font-weight: 700;
+    color: #1e3a50;
+}
+QPushButton:hover { background-color: #c7ddf0; }
+QPushButton:disabled {
+    background-color: #ebebeb;
+    border: 1px solid #d1d1d1;
+    color: #989898;
+}
+QSlider::groove:horizontal { height: 4px; background: #c2c2c2; border-radius: 2px; }
+QSlider::handle:horizontal {
+    background: #1477ba;
+    border: 2px solid #1477ba;
+    width: 14px; height: 14px;
+    margin: -5px 0; border-radius: 7px;
+}
+QSlider::sub-page:horizontal { background: #1477ba; border-radius: 2px; }
+QCheckBox::indicator, QRadioButton::indicator { background: #ffffff; border: 1px solid #9a9a9a; }
+QHeaderView::section {
+    background: #efefef;
+    color: #555555;
+    border: 1px solid #d0d0d0;
+    padding: 4px;
+}
+QSplitter::handle { background: #c7c7c7; }
+QLabel#section_label { color: #666666; }
+QLabel#value_label { color: #2e7d32; font-family: &quot;Consolas&quot;, &quot;Courier New&quot;, monospace; }
+QLabel#coords_label { color: #ef6c00; font-family: &quot;Consolas&quot;, &quot;Courier New&quot;, monospace; }
+   </string>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QHBoxLayout" name="rootLayout">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="QSplitter" name="mainSplitter">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <property name="childrenCollapsible">
+       <bool>false</bool>
+      </property>
+      <widget class="QWidget" name="leftPanel">
+       <property name="maximumSize">
+        <size>
+         <width>340</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <layout class="QVBoxLayout" name="leftLayout">
+        <property name="spacing">
+         <number>6</number>
+        </property>
+        <property name="leftMargin">
+         <number>6</number>
+        </property>
+        <property name="topMargin">
+         <number>6</number>
+        </property>
+        <property name="rightMargin">
+         <number>6</number>
+        </property>
+        <property name="bottomMargin">
+         <number>6</number>
+        </property>
+        <item>
+         <widget class="QGroupBox" name="grpObjects">
+          <property name="title">
+           <string>Objects</string>
+          </property>
+          <layout class="QVBoxLayout" name="objLayout">
+           <property name="leftMargin">
+            <number>6</number>
+           </property>
+           <property name="topMargin">
+            <number>14</number>
+           </property>
+           <property name="rightMargin">
+            <number>6</number>
+           </property>
+           <property name="bottomMargin">
+            <number>6</number>
+           </property>
+           <item>
+            <widget class="QTreeWidget" name="workspaceTree">
+             <property name="alternatingRowColors">
+              <bool>true</bool>
+             </property>
+             <property name="selectionMode">
+              <enum>QAbstractItemView::SingleSelection</enum>
+             </property>
+             <property name="columnCount">
+              <number>2</number>
+             </property>
+             <column>
+              <property name="text">
+               <string>Name</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>Type</string>
+              </property>
+             </column>
+             <item>
+              <property name="text">
+               <string>Workspace</string>
+              </property>
+              <item>
+               <property name="text">
+                <string>SEGY Volumes</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Horizons</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Attributes</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Depth Volumes</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Wells</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>Scripts</string>
+               </property>
+              </item>
+             </item>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="treeBtnsLayout">
+             <item>
+              <widget class="QPushButton" name="btnTreeAdd">
+               <property name="maximumSize">
+                <size>
+                 <width>32</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="toolTip">
+                <string>Add item</string>
+               </property>
+               <property name="text">
+                <string>＋</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnTreeRemove">
+               <property name="maximumSize">
+                <size>
+                 <width>32</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="toolTip">
+                <string>Remove</string>
+               </property>
+               <property name="text">
+                <string>✕</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnTreeUp">
+               <property name="maximumSize">
+                <size>
+                 <width>32</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="toolTip">
+                <string>Move up</string>
+               </property>
+               <property name="text">
+                <string>↑</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnTreeDown">
+               <property name="maximumSize">
+                <size>
+                 <width>32</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="toolTip">
+                <string>Move down</string>
+               </property>
+               <property name="text">
+                <string>↓</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="treeBtnsSpacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="grpNavigation">
+          <property name="title">
+           <string>Navigation</string>
+          </property>
+          <layout class="QFormLayout" name="navLayout">
+           <property name="verticalSpacing">
+            <number>8</number>
+           </property>
+           <property name="leftMargin">
+            <number>8</number>
+           </property>
+           <property name="topMargin">
+            <number>16</number>
+           </property>
+           <property name="rightMargin">
+            <number>8</number>
+           </property>
+           <property name="bottomMargin">
+            <number>8</number>
+           </property>
+           <item row="0" column="0">
+            <widget class="QLabel" name="section_label">
+             <property name="text">
+              <string>Inline:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QSpinBox" name="inlineSpin">
+             <property name="keyboardTracking">
+              <bool>false</bool>
+             </property>
+             <property name="maximum">
+              <number>9999</number>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="section_label">
+             <property name="text">
+              <string>Crossline:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QSpinBox" name="crosslineSpin">
+             <property name="keyboardTracking">
+              <bool>false</bool>
+             </property>
+             <property name="maximum">
+              <number>9999</number>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="section_label">
+             <property name="text">
+              <string>Z / Time:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QSpinBox" name="timesliceSpin">
+             <property name="keyboardTracking">
+              <bool>false</bool>
+             </property>
+             <property name="maximum">
+              <number>9999</number>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QLabel" name="section_label">
+             <property name="text">
+              <string>View Mode:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QComboBox" name="viewMode">
+             <item>
+              <property name="text">
+               <string>Inline View</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Crossline View</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Time Slice</string>
+              </property>
+             </item>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="grpDomain">
+          <property name="title">
+           <string>Data Domain</string>
+          </property>
+          <layout class="QHBoxLayout" name="domainLayout">
+           <item>
+            <widget class="QLabel" name="domainLabel">
+             <property name="styleSheet">
+              <string>color: #ff8c00; font-weight: 800; font-size: 12px; letter-spacing: 0.8px;</string>
+             </property>
+             <property name="text">
+              <string>⏱  TIME DOMAIN</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="domainSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="accent_btn">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string>Convert…</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="grpQuickActions">
+          <property name="title">
+           <string>Quick Actions</string>
+          </property>
+          <layout class="QVBoxLayout" name="qaLayout">
+           <property name="spacing">
+            <number>5</number>
+           </property>
+           <item>
+            <widget class="QPushButton" name="btnComputeAttributes">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string>⬡  Compute Attributes</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnApplyFilter">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string>⧖  Apply Filter / Processing</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnMLClassify">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string>◈  ML / AI Classification</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnPickHorizons">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string>∿  Horizon Picking</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="leftStretch">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="centerPanel">
+       <layout class="QVBoxLayout" name="centerLayout">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QSplitter" name="verticalSplitter">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="childrenCollapsible">
+           <bool>false</bool>
+          </property>
+          <widget class="QWidget" name="topCenter">
+           <layout class="QVBoxLayout" name="topCenterLayout">
+            <property name="spacing">
+             <number>0</number>
+            </property>
+            <property name="leftMargin">
+             <number>4</number>
+            </property>
+            <property name="topMargin">
+             <number>4</number>
+            </property>
+            <property name="rightMargin">
+             <number>4</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QTabWidget" name="tabsMain">
+              <property name="tabPosition">
+               <enum>QTabWidget::North</enum>
+              </property>
+              <property name="documentMode">
+               <bool>true</bool>
+              </property>
+              <widget class="QWidget" name="tabViewport">
+               <attribute name="title">
+                <string>🖥  Viewport</string>
+               </attribute>
+               <layout class="QVBoxLayout" name="viewportLayout">
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <item>
+                 <widget class="QWidget" name="seismicViewerPlaceholder" native="true">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+              <widget class="QWidget" name="tabAttributes">
+               <attribute name="title">
+                <string>⚡  Attributes</string>
+               </attribute>
+               <layout class="QVBoxLayout" name="attrTabLayout">
+                <item>
+                 <widget class="QWidget" name="attributePanelPlaceholder" native="true">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+              <widget class="QWidget" name="tabProcessing">
+               <attribute name="title">
+                <string>⚙  Processing</string>
+               </attribute>
+               <layout class="QVBoxLayout" name="procTabLayout">
+                <item>
+                 <widget class="QWidget" name="processingPanelPlaceholder" native="true">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+              <widget class="QWidget" name="tabInterpretation">
+               <attribute name="title">
+                <string>✎  Interpretation</string>
+               </attribute>
+               <layout class="QVBoxLayout" name="interpTabLayout">
+                <item>
+                 <widget class="QWidget" name="interpretationPanelPlaceholder" native="true">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+              <widget class="QWidget" name="tabDepthDomain">
+               <attribute name="title">
+                <string>⬇  Depth Domain</string>
+               </attribute>
+               <layout class="QVBoxLayout" name="depthTabLayout">
+                <property name="leftMargin">
+                 <number>8</number>
+                </property>
+                <property name="topMargin">
+                 <number>8</number>
+                </property>
+                <property name="rightMargin">
+                 <number>8</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>8</number>
+                </property>
+                <item>
+                 <widget class="QLabel" name="depthPlaceholderLabel">
+                  <property name="styleSheet">
+                   <string>color: #8b9099; font-size: 13px; padding: 20px;</string>
+                  </property>
+                  <property name="text">
+                   <string>⬇  Depth-converted volume will appear here after running
+  Processing → Time-to-Depth Conversion.</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QWidget" name="depthCanvasPlaceholder" native="true">
+                  <property name="sizePolicy">
+                   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                    <horstretch>0</horstretch>
+                    <verstretch>0</verstretch>
+                   </sizepolicy>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="bottomCenter">
+           <layout class="QHBoxLayout" name="bottomCenterLayout">
+            <property name="spacing">
+             <number>6</number>
+            </property>
+            <property name="leftMargin">
+             <number>4</number>
+            </property>
+            <property name="topMargin">
+             <number>4</number>
+            </property>
+            <property name="rightMargin">
+             <number>4</number>
+            </property>
+            <property name="bottomMargin">
+             <number>4</number>
+            </property>
+            <item>
+             <widget class="QGroupBox" name="grpCells">
+              <property name="title">
+               <string>Sample Data (Cells)</string>
+              </property>
+              <layout class="QVBoxLayout" name="cellsLayout">
+               <property name="leftMargin">
+                <number>6</number>
+               </property>
+               <property name="topMargin">
+                <number>14</number>
+               </property>
+               <property name="rightMargin">
+                <number>6</number>
+               </property>
+               <property name="bottomMargin">
+                <number>6</number>
+               </property>
+               <item>
+                <widget class="QTableWidget" name="dataTable">
+                 <property name="alternatingRowColors">
+                  <bool>true</bool>
+                 </property>
+                 <property name="selectionBehavior">
+                  <enum>QAbstractItemView::SelectRows</enum>
+                 </property>
+                 <property name="columnCount">
+                  <number>6</number>
+                 </property>
+                 <column>
+                  <property name="text">
+                   <string>IL</string>
+                  </property>
+                 </column>
+                 <column>
+                  <property name="text">
+                   <string>XL</string>
+                  </property>
+                 </column>
+                 <column>
+                  <property name="text">
+                   <string>Z/T</string>
+                  </property>
+                 </column>
+                 <column>
+                  <property name="text">
+                   <string>Amplitude</string>
+                  </property>
+                 </column>
+                 <column>
+                  <property name="text">
+                   <string>│Amp│</string>
+                  </property>
+                 </column>
+                 <column>
+                  <property name="text">
+                   <string>Phase°</string>
+                  </property>
+                 </column>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="grpStats">
+              <property name="title">
+               <string>Statistics &amp; Amplitude Distribution</string>
+              </property>
+              <layout class="QVBoxLayout" name="statsLayout">
+               <property name="leftMargin">
+                <number>6</number>
+               </property>
+               <property name="topMargin">
+                <number>14</number>
+               </property>
+               <property name="rightMargin">
+                <number>6</number>
+               </property>
+               <property name="bottomMargin">
+                <number>6</number>
+               </property>
+               <item>
+                <layout class="QGridLayout" name="statsGrid">
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="section_label">
+                   <property name="text">
+                    <string>Min:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QLabel" name="value_label">
+                   <property name="text">
+                    <string>—</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="2">
+                  <widget class="QLabel" name="section_label">
+                   <property name="text">
+                    <string>Max:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="3">
+                  <widget class="QLabel" name="value_label">
+                   <property name="text">
+                    <string>—</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="section_label">
+                   <property name="text">
+                    <string>Mean:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QLabel" name="value_label">
+                   <property name="text">
+                    <string>—</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="2">
+                  <widget class="QLabel" name="section_label">
+                   <property name="text">
+                    <string>Std:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="3">
+                  <widget class="QLabel" name="value_label">
+                   <property name="text">
+                    <string>—</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QLabel" name="section_label">
+                   <property name="text">
+                    <string>Median:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="1">
+                  <widget class="QLabel" name="value_label">
+                   <property name="text">
+                    <string>—</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="2">
+                  <widget class="QLabel" name="section_label">
+                   <property name="text">
+                    <string>RMS:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="3">
+                  <widget class="QLabel" name="value_label">
+                   <property name="text">
+                    <string>—</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <widget class="QWidget" name="histCanvasPlaceholder" native="true">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>80</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="rightPanel">
+       <property name="minimumSize">
+        <size>
+         <width>320</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>420</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <layout class="QVBoxLayout" name="rightLayout">
+        <property name="spacing">
+         <number>6</number>
+        </property>
+        <property name="leftMargin">
+         <number>6</number>
+        </property>
+        <property name="topMargin">
+         <number>6</number>
+        </property>
+        <property name="rightMargin">
+         <number>6</number>
+        </property>
+        <property name="bottomMargin">
+         <number>6</number>
+        </property>
+        <item>
+         <widget class="QScrollArea" name="rightScrollArea">
+          <property name="horizontalScrollBarPolicy">
+           <enum>Qt::ScrollBarAlwaysOff</enum>
+          </property>
+          <property name="widgetResizable">
+           <bool>true</bool>
+          </property>
+          <widget class="QWidget" name="scrollContent">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>406</width>
+             <height>974</height>
+            </rect>
+           </property>
+           <layout class="QVBoxLayout" name="scrollContentLayout">
+            <property name="spacing">
+             <number>8</number>
+            </property>
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QGroupBox" name="grpVisualParams">
+              <property name="title">
+               <string>Visual Parameters</string>
+              </property>
+              <layout class="QVBoxLayout" name="vpLayout">
+               <property name="spacing">
+                <number>6</number>
+               </property>
+               <item>
+                <widget class="QCheckBox" name="chkShowGrid">
+                 <property name="text">
+                  <string>Show Grid</string>
+                 </property>
+                 <property name="checked">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="chkShowAxis">
+                 <property name="text">
+                  <string>Show Axis Labels</string>
+                 </property>
+                 <property name="checked">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="chkSmooth">
+                 <property name="text">
+                  <string>Smooth Interpolation</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="chkWiggle">
+                 <property name="text">
+                  <string>Wiggle Trace Overlay</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="chkCrosshair">
+                 <property name="text">
+                  <string>Crosshair Cursor</string>
+                 </property>
+                 <property name="checked">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="grpSections">
+              <property name="title">
+               <string>Section Slicers</string>
+              </property>
+              <layout class="QVBoxLayout" name="sectionsLayout">
+               <property name="spacing">
+                <number>10</number>
+               </property>
+               <property name="leftMargin">
+                <number>8</number>
+               </property>
+               <property name="topMargin">
+                <number>16</number>
+               </property>
+               <property name="rightMargin">
+                <number>8</number>
+               </property>
+               <property name="bottomMargin">
+                <number>8</number>
+               </property>
+               <item>
+                <layout class="QHBoxLayout" name="uSectionRow">
+                 <property name="spacing">
+                  <number>6</number>
+                 </property>
+                 <item>
+                  <widget class="QCheckBox" name="uCheck">
+                   <property name="minimumSize">
+                    <size>
+                     <width>100</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>U  (Inline)</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QSpinBox" name="uSpin">
+                   <property name="maximumSize">
+                    <size>
+                     <width>72</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="keyboardTracking">
+                    <bool>false</bool>
+                   </property>
+                   <property name="maximum">
+                    <number>9999</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QSlider" name="uSlider">
+                   <property name="maximum">
+                    <number>9999</number>
+                   </property>
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="vSectionRow">
+                 <property name="spacing">
+                  <number>6</number>
+                 </property>
+                 <item>
+                  <widget class="QCheckBox" name="vCheck">
+                   <property name="minimumSize">
+                    <size>
+                     <width>100</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>V  (Crossline)</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QSpinBox" name="vSpin">
+                   <property name="maximumSize">
+                    <size>
+                     <width>72</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="keyboardTracking">
+                    <bool>false</bool>
+                   </property>
+                   <property name="maximum">
+                    <number>9999</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QSlider" name="vSlider">
+                   <property name="maximum">
+                    <number>9999</number>
+                   </property>
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="zSectionRow">
+                 <property name="spacing">
+                  <number>6</number>
+                 </property>
+                 <item>
+                  <widget class="QCheckBox" name="zCheck">
+                   <property name="minimumSize">
+                    <size>
+                     <width>100</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>Z  (Time/Depth)</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QSpinBox" name="zSpin">
+                   <property name="maximumSize">
+                    <size>
+                     <width>72</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="keyboardTracking">
+                    <bool>false</bool>
+                   </property>
+                   <property name="maximum">
+                    <number>9999</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QSlider" name="zSlider">
+                   <property name="maximum">
+                    <number>9999</number>
+                   </property>
+                   <property name="orientation">
+                    <enum>Qt::Horizontal</enum>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="grpDisplay">
+              <property name="title">
+               <string>Display Settings</string>
+              </property>
+              <layout class="QFormLayout" name="displayLayout">
+               <property name="verticalSpacing">
+                <number>8</number>
+               </property>
+               <property name="leftMargin">
+                <number>8</number>
+               </property>
+               <property name="topMargin">
+                <number>16</number>
+               </property>
+               <property name="rightMargin">
+                <number>8</number>
+               </property>
+               <property name="bottomMargin">
+                <number>8</number>
+               </property>
+               <item row="0" column="0">
+                <widget class="QLabel" name="section_label">
+                 <property name="text">
+                  <string>Colormap:</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QComboBox" name="colormap">
+                 <item>
+                  <property name="text">
+                   <string>seismic</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>gray</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>viridis</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>RdBu</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>bwr</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>jet</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>plasma</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>inferno</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>coolwarm</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>PuOr</string>
+                  </property>
+                 </item>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="section_label">
+                 <property name="text">
+                  <string>Gain:</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QDoubleSpinBox" name="gainSpin">
+                 <property name="keyboardTracking">
+                  <bool>false</bool>
+                 </property>
+                 <property name="minimum">
+                  <double>0.010000000000000</double>
+                 </property>
+                 <property name="maximum">
+                  <double>20.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.100000000000000</double>
+                 </property>
+                 <property name="value">
+                  <double>1.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="0">
+                <widget class="QLabel" name="section_label">
+                 <property name="text">
+                  <string>Clip %:</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="1">
+                <widget class="QDoubleSpinBox" name="clipSpin">
+                 <property name="keyboardTracking">
+                  <bool>false</bool>
+                 </property>
+                 <property name="minimum">
+                  <double>0.100000000000000</double>
+                 </property>
+                 <property name="maximum">
+                  <double>100.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>1.000000000000000</double>
+                 </property>
+                 <property name="value">
+                  <double>99.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="0">
+                <widget class="QLabel" name="section_label">
+                 <property name="text">
+                  <string>Opacity:</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="1">
+                <widget class="QSlider" name="opacitySlider">
+                 <property name="minimum">
+                  <number>10</number>
+                 </property>
+                 <property name="maximum">
+                  <number>100</number>
+                 </property>
+                 <property name="value">
+                  <number>100</number>
+                 </property>
+                 <property name="orientation">
+                  <enum>Qt::Horizontal</enum>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="grpTimeDepth">
+              <property name="title">
+               <string>Time ↔ Depth</string>
+              </property>
+              <layout class="QVBoxLayout" name="tdLayout">
+               <property name="leftMargin">
+                <number>8</number>
+               </property>
+               <property name="topMargin">
+                <number>16</number>
+               </property>
+               <property name="rightMargin">
+                <number>8</number>
+               </property>
+               <property name="bottomMargin">
+                <number>8</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="value_label">
+                 <property name="text">
+                  <string>Domain: Time (ms)</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="section_label">
+                 <property name="text">
+                  <string>Velocity Model: —</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="tdBtnRow">
+                 <item>
+                  <widget class="QPushButton" name="success_btn">
+                   <property name="enabled">
+                    <bool>false</bool>
+                   </property>
+                   <property name="text">
+                    <string>Quick Convert</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="btnTdAdvanced">
+                   <property name="enabled">
+                    <bool>false</bool>
+                   </property>
+                   <property name="text">
+                    <string>Advanced…</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="grpWavelet">
+              <property name="title">
+               <string>Wavelet Inspector</string>
+              </property>
+              <layout class="QVBoxLayout" name="waveletLayout">
+               <property name="leftMargin">
+                <number>8</number>
+               </property>
+               <property name="topMargin">
+                <number>16</number>
+               </property>
+               <property name="rightMargin">
+                <number>8</number>
+               </property>
+               <property name="bottomMargin">
+                <number>8</number>
+               </property>
+               <item>
+                <widget class="QWidget" name="waveletCanvasPlaceholder" native="true">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>100</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <spacer name="rightStretch">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>40</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1920</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+    <addaction name="actionOpen"/>
+    <addaction name="actionOpenMulti"/>
+    <addaction name="separator"/>
+    <addaction name="actionSaveProject"/>
+    <addaction name="separator"/>
+    <addaction name="actionExport"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <addaction name="actionResetView"/>
+    <addaction name="actionFullscreen"/>
+    <addaction name="separator"/>
+    <addaction name="actionDarkTheme"/>
+   </widget>
+   <widget class="QMenu" name="menuSurvey">
+    <property name="title">
+     <string>Survey</string>
+    </property>
+    <addaction name="actionSurveySetup"/>
+    <addaction name="separator"/>
+    <addaction name="actionWellImport"/>
+    <addaction name="actionHorizonImport"/>
+   </widget>
+   <widget class="QMenu" name="menuProcessing">
+    <property name="title">
+     <string>Processing</string>
+    </property>
+    <addaction name="actionBandpass"/>
+    <addaction name="actionGainCorr"/>
+    <addaction name="actionNormalize"/>
+    <addaction name="actionDeconvolve"/>
+    <addaction name="separator"/>
+    <addaction name="actionT2D"/>
+    <addaction name="actionD2T"/>
+   </widget>
+   <widget class="QMenu" name="menuAttributes">
+    <property name="title">
+     <string>Attributes</string>
+    </property>
+    <addaction name="actionRMS"/>
+    <addaction name="actionInstAmp"/>
+    <addaction name="actionInstPhase"/>
+    <addaction name="actionInstFreq"/>
+    <addaction name="separator"/>
+    <addaction name="actionSemblance"/>
+    <addaction name="actionCurvature"/>
+   </widget>
+   <widget class="QMenu" name="menuInterpretation">
+    <property name="title">
+     <string>Interpretation</string>
+    </property>
+    <addaction name="actionPickHorizons"/>
+    <addaction name="actionFaultDetect"/>
+    <addaction name="actionFacies"/>
+   </widget>
+   <widget class="QMenu" name="menuML">
+    <property name="title">
+     <string>Machine Learning</string>
+    </property>
+    <addaction name="actionKMeans"/>
+    <addaction name="actionDBSCAN"/>
+    <addaction name="separator"/>
+    <addaction name="actionCNN"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionDocs"/>
+    <addaction name="separator"/>
+    <addaction name="actionAbout"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuView"/>
+   <addaction name="menuSurvey"/>
+   <addaction name="menuProcessing"/>
+   <addaction name="menuAttributes"/>
+   <addaction name="menuInterpretation"/>
+   <addaction name="menuML"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <widget class="QToolBar" name="toolbarMain">
+   <property name="windowTitle">
+    <string>Main Toolbar</string>
+   </property>
+   <property name="movable">
+    <bool>false</bool>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionOpen"/>
+   <addaction name="actionExport"/>
+   <addaction name="separator"/>
+   <addaction name="actionT2D"/>
+   <addaction name="actionBandpass"/>
+   <addaction name="separator"/>
+   <addaction name="actionRMS"/>
+   <addaction name="actionInstAmp"/>
+   <addaction name="separator"/>
+   <addaction name="actionResetView"/>
+   <addaction name="actionFullscreen"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionOpen">
+   <property name="text">
+    <string>Open SEG-Y…</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="actionOpenMulti">
+   <property name="text">
+    <string>Open Multiple Volumes…</string>
+   </property>
+  </action>
+  <action name="actionSaveProject">
+   <property name="text">
+    <string>Save Project…</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionExport">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Export Data…</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+E</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="text">
+    <string>Exit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="actionResetView">
+   <property name="text">
+    <string>Reset View</string>
+   </property>
+  </action>
+  <action name="actionFullscreen">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Full Screen</string>
+   </property>
+   <property name="shortcut">
+    <string>F11</string>
+   </property>
+  </action>
+  <action name="actionDarkTheme">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Light Theme</string>
+   </property>
+  </action>
+  <action name="actionSurveySetup">
+   <property name="text">
+    <string>Survey Setup…</string>
+   </property>
+  </action>
+  <action name="actionWellImport">
+   <property name="text">
+    <string>Import Well Data…</string>
+   </property>
+  </action>
+  <action name="actionHorizonImport">
+   <property name="text">
+    <string>Import Horizons…</string>
+   </property>
+  </action>
+  <action name="actionBandpass">
+   <property name="text">
+    <string>Bandpass Filter…</string>
+   </property>
+  </action>
+  <action name="actionGainCorr">
+   <property name="text">
+    <string>Gain Correction…</string>
+   </property>
+  </action>
+  <action name="actionNormalize">
+   <property name="text">
+    <string>Normalize</string>
+   </property>
+  </action>
+  <action name="actionDeconvolve">
+   <property name="text">
+    <string>Deconvolution…</string>
+   </property>
+  </action>
+  <action name="actionT2D">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Time → Depth Conversion…</string>
+   </property>
+  </action>
+  <action name="actionD2T">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Depth → Time Conversion…</string>
+   </property>
+  </action>
+  <action name="actionRMS">
+   <property name="text">
+    <string>RMS Amplitude</string>
+   </property>
+  </action>
+  <action name="actionInstAmp">
+   <property name="text">
+    <string>Instantaneous Amplitude</string>
+   </property>
+  </action>
+  <action name="actionInstPhase">
+   <property name="text">
+    <string>Instantaneous Phase</string>
+   </property>
+  </action>
+  <action name="actionInstFreq">
+   <property name="text">
+    <string>Instantaneous Frequency</string>
+   </property>
+  </action>
+  <action name="actionSemblance">
+   <property name="text">
+    <string>Semblance / Coherence</string>
+   </property>
+  </action>
+  <action name="actionCurvature">
+   <property name="text">
+    <string>Curvature</string>
+   </property>
+  </action>
+  <action name="actionPickHorizons">
+   <property name="text">
+    <string>Horizon Picking</string>
+   </property>
+  </action>
+  <action name="actionFaultDetect">
+   <property name="text">
+    <string>Fault Detection…</string>
+   </property>
+  </action>
+  <action name="actionFacies">
+   <property name="text">
+    <string>Facies Classification…</string>
+   </property>
+  </action>
+  <action name="actionKMeans">
+   <property name="text">
+    <string>K-Means Clustering</string>
+   </property>
+  </action>
+  <action name="actionDBSCAN">
+   <property name="text">
+    <string>DBSCAN</string>
+   </property>
+  </action>
+  <action name="actionCNN">
+   <property name="text">
+    <string>CNN Facies Predictor…</string>
+   </property>
+  </action>
+  <action name="actionDocs">
+   <property name="text">
+    <string>Documentation</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About SeisLab Pro</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
