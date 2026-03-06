@@ -14,7 +14,7 @@ A professional desktop GUI application for seismic data analysis, visualization,
 - **Interactive Visualization**: High-quality seismic section displays with customizable colormaps
 - **Attribute Extraction**: Compute advanced seismic attributes
 - **Signal Processing**: Apply professional-grade filters and gain controls
-- **Machine Learning**: Unsupervised facies classification
+- **Machine Learning**: Supervised and Unsupervised facies classification
 - **Interpretation Tools**: Interactive horizon picking and analysis
 
 ### 📊 Supported Attributes
