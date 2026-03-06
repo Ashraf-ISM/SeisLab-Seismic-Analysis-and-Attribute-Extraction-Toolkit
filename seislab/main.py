@@ -55,7 +55,7 @@ def main():
     app.processEvents()
 
     # Simulated loading delay (optional)
-    time.sleep(1.5)
+    time.sleep(0.005)
 
     # -------------------------------
     # Main Window

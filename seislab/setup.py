@@ -32,10 +32,13 @@ setup(
         "scipy>=1.7.0",
         "matplotlib>=3.4.0",
         "PyQt5>=5.15.0",
+        "netCDF4>=1.6.0",
+        "xarray>=2023.1.0",
         "scikit-learn>=0.24.0",
     ],
     extras_require={
         "segy": ["segyio>=1.9.0"],
+        "netcdf": ["netCDF4>=1.6.0", "xarray>=2023.1.0"],
         "advanced": ["pyqtgraph>=0.12.0"],
     },
     entry_points={

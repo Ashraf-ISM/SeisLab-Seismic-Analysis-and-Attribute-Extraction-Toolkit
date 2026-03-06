@@ -402,6 +402,13 @@ class WellExplorer(QDockWidget):
         root.setExpanded(True)
         curves_node.setExpanded(True)
 
+    def rebuild_tree(self):
+        wells = list(self.wells.values())
+        self.tree.clear()
+        self.wells = {}
+        for well in wells:
+            self.add_well(well)
+
     def remove_selected(self):
         items = self.tree.selectedItems()
         if not items:
@@ -1140,6 +1147,13 @@ class WellLogViewer(QMainWindow):
         wm.addAction("Restore", self._restore_window)
         wm.addAction("Toggle Full Screen", self._toggle_fullscreen, "F11")
 
+        # Facies classification workflows
+        facies_menu = mb.addMenu("&Facies")
+        facies_menu.addAction("Run Facies Classification", self._run_facies)
+        facies_menu.addAction("Supervised Classification", self._supervised_facies)
+        facies_menu.addAction("Unsupervised Classification", self._unsupervised_facies)
+        facies_menu.addSeparator()
+
         hm = mb.addMenu("&Help")
         hm.addAction("About",            self._about)
 
@@ -1248,6 +1262,119 @@ class WellLogViewer(QMainWindow):
             return
         self.xplot_canvas.plot(self.current_well, x, y,
                                 col or None, sz or None)
+
+    def _ensure_active_well(self, action_name):
+        if self.current_well is not None:
+            return True
+        QMessageBox.warning(self, action_name, "Load a LAS or CSV well before running facies classification.")
+        return False
+
+    def _refresh_current_well_views(self):
+        if not self.current_well:
+            return
+        self.explorer.rebuild_tree()
+        self._on_well_selected(self.current_well)
+
+    def _format_facies_mapping(self, label_mapping):
+        if not label_mapping:
+            return ""
+        entries = [f"{code}={label}" for code, label in label_mapping.items()]
+        if len(entries) > 8:
+            entries = entries[:8] + ["..."]
+        return "\nCode mapping: " + ", ".join(entries)
+
+    def _run_facies(self):
+        if not self._ensure_active_well("Facies Classification"):
+            return
+
+        chooser = QMessageBox(self)
+        chooser.setWindowTitle("Facies Classification")
+        chooser.setText("Choose the facies-classification workflow to run.")
+        supervised_btn = chooser.addButton("Supervised", QMessageBox.AcceptRole)
+        unsupervised_btn = chooser.addButton("Unsupervised", QMessageBox.AcceptRole)
+        chooser.addButton(QMessageBox.Cancel)
+        chooser.exec_()
+
+        clicked = chooser.clickedButton()
+        if clicked is supervised_btn:
+            self._supervised_facies()
+        elif clicked is unsupervised_btn:
+            self._unsupervised_facies()
+
+    def _supervised_facies(self):
+        if not self._ensure_active_well("Supervised Classification"):
+            return
+
+        from gui.facies_supervised import SupervisedFaciesDialog
+
+        dialog = SupervisedFaciesDialog(self.current_well, self)
+        if dialog.exec_() != QDialog.Accepted:
+            return
+
+        result = dialog.get_result()
+        if result is None:
+            return
+
+        self.current_well.df[result.output_column] = result.prediction_codes
+        self.current_well.curves[result.output_column] = {
+            'unit': 'class',
+            'desc': f"Supervised facies codes generated with {result.model_name}",
+        }
+        self._refresh_current_well_views()
+        self.status.showMessage(
+            f"Created facies curve: {result.output_column} ({result.model_name})"
+        )
+
+        QMessageBox.information(
+            self,
+            "Supervised Classification Complete",
+            (
+                f"Output column: {result.output_column}\n"
+                f"Method: {result.model_name}\n"
+                f"Rows classified: {result.used_rows}\n"
+                f"Training rows: {result.train_rows}\n"
+                f"Validation rows: {result.validation_rows}\n"
+                f"Train accuracy: {result.train_accuracy:.3f}\n"
+                f"Validation accuracy: {result.validation_accuracy:.3f}"
+                f"{self._format_facies_mapping(result.label_mapping)}"
+            ),
+        )
+
+    def _unsupervised_facies(self):
+        if not self._ensure_active_well("Unsupervised Classification"):
+            return
+
+        from gui.facies_unsupervised import UnsupervisedFaciesDialog
+
+        dialog = UnsupervisedFaciesDialog(self.current_well, self)
+        if dialog.exec_() != QDialog.Accepted:
+            return
+
+        result = dialog.get_result()
+        if result is None:
+            return
+
+        self.current_well.df[result.output_column] = result.prediction_codes
+        self.current_well.curves[result.output_column] = {
+            'unit': 'class',
+            'desc': f"Unsupervised facies codes generated with {result.model_name}",
+        }
+        self._refresh_current_well_views()
+        self.status.showMessage(
+            f"Created facies curve: {result.output_column} ({result.model_name})"
+        )
+
+        QMessageBox.information(
+            self,
+            "Unsupervised Classification Complete",
+            (
+                f"Output column: {result.output_column}\n"
+                f"Method: {result.model_name}\n"
+                f"Rows classified: {result.used_rows}\n"
+                f"Clusters found: {result.cluster_count}\n"
+                f"Noise samples: {result.noise_points}"
+            ),
+        )
 
     def _minimize_window(self):
         self.showMinimized()

@@ -11,6 +11,8 @@ PyQt5>=5.15.0
 
 # Seismic data handling
 segyio>=1.9.0
+netCDF4>=1.6.0
+xarray>=2023.1.0
 
 # Machine learning
 scikit-learn>=0.24.0

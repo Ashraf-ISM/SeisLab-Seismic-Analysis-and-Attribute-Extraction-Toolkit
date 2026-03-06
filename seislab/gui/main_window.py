@@ -731,7 +731,6 @@ class SeisLabApp(QMainWindow):
 
         self.setup_ui()
         self.setup_menubar()
-        self.setup_toolbar()
         self.setup_statusbar()
         self.connect_signals()
         self.apply_light_theme()
@@ -764,6 +763,8 @@ class SeisLabApp(QMainWindow):
         self.main_splitter.setStretchFactor(1, 6)
         self.main_splitter.setStretchFactor(2, 2)
         self.main_splitter.setSizes([280, 1260, 380])
+        self._standard_main_sizes = [280, 1260, 380]
+        self._standard_center_sizes = [860, 120]
 
         root.addWidget(self.main_splitter)
 
@@ -808,32 +809,34 @@ class SeisLabApp(QMainWindow):
             tree_btns.addWidget(b)
         tree_btns.addStretch()
         obj_lay.addLayout(tree_btns)
-        layout.addWidget(obj_grp)
+        layout.addWidget(obj_grp, 5)
 
         # ── Info panel ──
         self.info_panel = InfoPanel()
-        layout.addWidget(self.info_panel)
+        layout.addWidget(self.info_panel, 2)
 
+        # ── Navigation ──
         # ── Navigation ──
         nav_grp = QGroupBox("Navigation")
         nav_lay = QFormLayout(nav_grp)
         nav_lay.setContentsMargins(8, 16, 8, 8)
         nav_lay.setSpacing(8)
-
-        self.inline_spin     = self._make_spinbox(0, 9999)
-        self.crossline_spin  = self._make_spinbox(0, 9999)
-        self.timeslice_spin  = self._make_spinbox(0, 9999)
-
+        
+        self.inline_spin = self._make_spinbox(0, 9999)
+        self.crossline_spin = self._make_spinbox(0, 9999)
+        self.timeslice_spin = self._make_spinbox(0, 9999)
+        
         self.view_mode = QComboBox()
         self.view_mode.addItems(["Inline View", "Crossline View", "Time Slice"])
-
-        nav_lay.addRow(self._nav_label("Inline:"),    self.inline_spin)
+        
+        nav_lay.addRow(self._nav_label("Inline:"), self.inline_spin)
         nav_lay.addRow(self._nav_label("Crossline:"), self.crossline_spin)
-        nav_lay.addRow(self._nav_label("Z / Time:"),  self.timeslice_spin)
+        nav_lay.addRow(self._nav_label("Z / Time:"), self.timeslice_spin)
         nav_lay.addRow(self._nav_label("View Mode:"), self.view_mode)
-        layout.addWidget(nav_grp)
+        
+        layout.addWidget(nav_grp, 2)
 
-        # ── Domain indicator ──
+         # ── Domain indicator ──
         domain_grp = QGroupBox("Data Domain")
         domain_lay = QHBoxLayout(domain_grp)
         self.domain_label = QLabel("⏱  TIME DOMAIN")
@@ -845,23 +848,7 @@ class SeisLabApp(QMainWindow):
         self.btn_convert_domain.setObjectName("accent_btn")
         self.btn_convert_domain.setEnabled(False)
         domain_lay.addWidget(self.btn_convert_domain)
-        layout.addWidget(domain_grp)
-
-        # ── Quick actions ──
-        qa_grp = QGroupBox("Quick Actions")
-        qa_lay = QVBoxLayout(qa_grp)
-        qa_lay.setSpacing(5)
-
-        self.btn_compute_attributes = QPushButton("⬡  Compute Attributes")
-        self.btn_apply_filter       = QPushButton("⧖  Apply Filter / Processing")
-        self.btn_ml_classify        = QPushButton("◈  ML / AI Classification")
-        self.btn_pick_horizons      = QPushButton("∿  Horizon Picking")
-
-        for btn in [self.btn_compute_attributes, self.btn_apply_filter,
-                    self.btn_ml_classify, self.btn_pick_horizons]:
-            btn.setEnabled(False)
-            qa_lay.addWidget(btn)
-        layout.addWidget(qa_grp)
+        layout.addWidget(domain_grp, 1)
 
         layout.addStretch()
         return panel
@@ -875,6 +862,7 @@ class SeisLabApp(QMainWindow):
 
         vsplit = QSplitter(Qt.Vertical)
         vsplit.setChildrenCollapsible(False)
+        self.center_splitter = vsplit
 
         # ── Top: main viewport tabs ──
         top = QWidget()
@@ -904,6 +892,7 @@ class SeisLabApp(QMainWindow):
 
         # ── Bottom: cells + statistics ──
         bottom = QWidget()
+        self.bottom_panel = bottom
         bot_lay = QHBoxLayout(bottom)
         bot_lay.setContentsMargins(4, 4, 4, 4)
         bot_lay.setSpacing(6)
@@ -948,9 +937,9 @@ class SeisLabApp(QMainWindow):
 
         vsplit.addWidget(top)
         vsplit.addWidget(bottom)
-        vsplit.setStretchFactor(0, 5)
+        vsplit.setStretchFactor(0, 8)
         vsplit.setStretchFactor(1, 1)
-        vsplit.setSizes([780, 200])
+        vsplit.setSizes([860, 120])
 
         layout.addWidget(vsplit)
         return panel
@@ -1223,38 +1212,8 @@ class SeisLabApp(QMainWindow):
     #  TOOLBAR
     # ──────────────────────────────────────────
     def setup_toolbar(self):
-        tb = QToolBar("Main Toolbar")
-        tb.setMovable(False)
-        tb.setIconSize(QSize(20, 20))
-        self.addToolBar(tb)
-
-        for action in [self.action_t2d, self.action_bandpass]:
-            tb.addAction(action)
-        tb.addSeparator()
-
-        for action in [self.action_rms, self.action_inst_amp]:
-            tb.addAction(action)
-        tb.addSeparator()
-
-        tb.addAction(self.action_reset_view)
-        tb.addAction(self.action_fullscreen)
-
-        # Spacer
-        spacer = QWidget(); spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        tb.addWidget(spacer)
-
-        # Domain indicator in toolbar
-        self.toolbar_domain_lbl = QLabel("  ⏱ TIME  ")
-        self.toolbar_domain_lbl.setStyleSheet(
-            f"color: {ACCENT_ORANGE}; font-weight: 800; font-size: 12px; padding: 0 8px; "
-            f"border: 1px solid {ACCENT_ORANGE}; border-radius: 3px;")
-        tb.addWidget(self.toolbar_domain_lbl)
-        tb.addSeparator()
-
-        # Memory / info
-        self.toolbar_info_lbl = QLabel("No data loaded  ")
-        self.toolbar_info_lbl.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11px;")
-        tb.addWidget(self.toolbar_info_lbl)
+        # Intentionally left unused: top quick-action toolbar removed.
+        return
 
     # ──────────────────────────────────────────
     #  STATUS BAR
@@ -1309,8 +1268,6 @@ class SeisLabApp(QMainWindow):
         self.action_d2t.triggered.connect(self.show_depth_time_dialog)
         self.action_well_import.triggered.connect(self.import_well_data)
         self.btn_convert_domain.clicked.connect(self.show_time_depth_dialog)
-        self.btn_td_quick.clicked.connect(self._quick_t2d)
-        self.btn_td_advanced.clicked.connect(self.show_time_depth_dialog)
 
         self.inline_spin.valueChanged.connect(self.update_inline)
         self.crossline_spin.valueChanged.connect(self.update_crossline)
@@ -1333,18 +1290,14 @@ class SeisLabApp(QMainWindow):
         self.gain_spin.valueChanged.connect(self.update_gain)
         self.clip_spin.valueChanged.connect(self.update_clip)
 
-        self.btn_compute_attributes.clicked.connect(self.show_attributes_tab)
-        self.btn_apply_filter.clicked.connect(self.show_processing_tab)
-        self.btn_ml_classify.clicked.connect(self.show_ml_dialog)
-        self.btn_pick_horizons.clicked.connect(
-            lambda: self.tabs.setCurrentWidget(self.interpretation_panel))
-
         self.action_rms.triggered.connect(lambda: self.compute_attribute("rms"))
         self.action_inst_amp.triggered.connect(lambda: self.compute_attribute("inst_amp"))
         self.action_inst_phase.triggered.connect(lambda: self.compute_attribute("inst_phase"))
         self.action_inst_freq.triggered.connect(lambda: self.compute_attribute("inst_freq"))
 
         self.action_about.triggered.connect(self.show_about)
+        self.tabs.currentChanged.connect(self._sync_workspace_panels)
+        self._sync_workspace_panels(self.tabs.currentIndex())
 
     # ──────────────────────────────────────────
     #  SYNC HELPERS
@@ -1382,17 +1335,48 @@ class SeisLabApp(QMainWindow):
         self._sync(self.z_spin, self.z_slider, self.current_timeslice)
         self.render_timer.start(35)
 
+    def _sync_workspace_panels(self, index=None):
+        if index is None:
+            index = self.tabs.currentIndex()
+
+        attr_mode = self.tabs.widget(index) is self.attribute_panel
+        if attr_mode:
+            sizes = self.main_splitter.sizes()
+            if len(sizes) == 3 and sizes[2] > 0:
+                self._standard_main_sizes = sizes
+
+            center_sizes = self.center_splitter.sizes()
+            if len(center_sizes) == 2 and center_sizes[1] > 0:
+                self._standard_center_sizes = center_sizes
+
+            self.right_panel.hide()
+            self.bottom_panel.hide()
+
+            left_size = self._standard_main_sizes[0]
+            center_size = self._standard_main_sizes[1] + self._standard_main_sizes[2]
+            self.main_splitter.setSizes([left_size, center_size, 0])
+            self.center_splitter.setSizes([1, 0])
+            return
+
+        self.right_panel.show()
+        self.bottom_panel.show()
+        self.main_splitter.setSizes(self._standard_main_sizes)
+        self.center_splitter.setSizes(self._standard_center_sizes)
+
     # ──────────────────────────────────────────
     #  DATA LOADING
     # ──────────────────────────────────────────
     def load_segy(self):
         filepath, _ = QFileDialog.getOpenFileName(
-            self, "Open SEG-Y File", "",
-            "SEG-Y Files (*.sgy *.segy);;All Files (*)")
+            self, "Open Seismic File", "",
+            "Seismic Files (*.sgy *.segy *.nc *.nc4 *.cdf);;"
+            "SEG-Y Files (*.sgy *.segy);;"
+            "NetCDF Files (*.nc *.nc4 *.cdf);;"
+            "All Files (*)")
         if not filepath:
             return
         try:
-            self.status_label.setText("Loading SEG-Y file…")
+            self.status_label.setText("Loading seismic file…")
             self.progress_bar.setVisible(True); self.progress_bar.setRange(0, 0)
 
             self.segy_loader = SegyLoader(filepath)
@@ -1407,9 +1391,8 @@ class SeisLabApp(QMainWindow):
 
             name = os.path.basename(filepath)
             self.status_label.setText(f"Loaded: {name}")
-            self.toolbar_info_lbl.setText(f"  {name}  ")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to load SEG-Y:\n{e}")
+            QMessageBox.critical(self, "Error", f"Failed to load seismic file:\n{e}")
             self.status_label.setText("Load failed")
         finally:
             self.progress_bar.setVisible(False)
@@ -1479,7 +1462,9 @@ class SeisLabApp(QMainWindow):
             self._sync(spin, slider or spin, val)
 
         filename = os.path.basename(info.get("filepath", "unknown.segy"))
-        self.tree_segy_imports.addChild(QTreeWidgetItem([filename, "SEGY"]))
+        file_ext = os.path.splitext(filename)[1].lower()
+        file_kind = "NETCDF" if file_ext in {".nc", ".nc4", ".cdf", ".netcdf"} else "SEGY"
+        self.tree_segy_imports.addChild(QTreeWidgetItem([filename, file_kind]))
         self.workspace_tree.expandAll()
 
     def enable_controls(self):
@@ -1487,11 +1472,6 @@ class SeisLabApp(QMainWindow):
         self.action_t2d.setEnabled(True)
         self.action_d2t.setEnabled(True)
         self.btn_convert_domain.setEnabled(True)
-        self.btn_td_quick.setEnabled(True)
-        self.btn_td_advanced.setEnabled(True)
-        for btn in [self.btn_compute_attributes, self.btn_apply_filter,
-                    self.btn_ml_classify, self.btn_pick_horizons]:
-            btn.setEnabled(True)
 
     # ──────────────────────────────────────────
     #  DISPLAY
@@ -1517,8 +1497,31 @@ class SeisLabApp(QMainWindow):
             self._sync(self.z_spin, self.z_slider, self.current_timeslice)
 
             vm = self.view_mode.currentText()
-            if vm in ["Inline View", "Crossline View"]:
+            if vm == "Inline View":
                 self.current_data = self.segy_loader.get_inline(self.current_inline)
+                section_kind = "Inline"
+                section_index = self.current_inline
+                horizontal_label = "Crossline Number"
+                vertical_label = "Time (samples)"
+                self.seismic_viewer.display_inline_crossline(
+                    self.segy_loader.data,
+                    self.current_inline, self.current_crossline,
+                    timeslice_index=self.current_timeslice,
+                    show_inline=self.u_check.isChecked(),
+                    show_crossline=self.v_check.isChecked(),
+                    show_timeslice=self.z_check.isChecked(),
+                    colormap=self.colormap.currentText(),
+                    gain=self.gain_spin.value(),
+                    clip=self.clip_spin.value(),
+                    show_grid=self.chk_show_grid.isChecked(),
+                    show_axis=self.chk_show_axis.isChecked(),
+                )
+            elif vm == "Crossline View":
+                self.current_data = self.segy_loader.get_crossline(self.current_crossline)
+                section_kind = "Crossline"
+                section_index = self.current_crossline
+                horizontal_label = "Inline Number"
+                vertical_label = "Time (samples)"
                 self.seismic_viewer.display_inline_crossline(
                     self.segy_loader.data,
                     self.current_inline, self.current_crossline,
@@ -1534,6 +1537,10 @@ class SeisLabApp(QMainWindow):
                 )
             else:
                 self.current_data = self.segy_loader.get_timeslice(self.current_timeslice)
+                section_kind = "Time Slice"
+                section_index = self.current_timeslice
+                horizontal_label = "Inline Number"
+                vertical_label = "Crossline Number"
                 self.seismic_viewer.display_section(
                     self.current_data,
                     colormap=self.colormap.currentText(),
@@ -1545,6 +1552,14 @@ class SeisLabApp(QMainWindow):
                 self.current_data,
                 sample_rate_ms=self.segy_loader.sample_rate if self.segy_loader else None,
                 sample_axis=1,
+                section_kind=section_kind,
+                section_index=section_index,
+                horizontal_label=horizontal_label,
+                vertical_label=vertical_label,
+                volume=self.segy_loader.data if self.segy_loader is not None else None,
+                inline_index=self.current_inline,
+                crossline_index=self.current_crossline,
+                timeslice_index=self.current_timeslice,
             )
             self._refresh_data_panels(self.current_data)
             self._update_wavelet_panel(self.current_data)
@@ -1771,10 +1786,6 @@ class SeisLabApp(QMainWindow):
         self.domain_label.setText(txt)
         self.domain_label.setStyleSheet(
             f"color: {col}; font-weight: 800; font-size: 12px; letter-spacing: 0.8px;")
-        self.toolbar_domain_lbl.setText(f"  {'⬇ DEPTH' if self.depth_mode else '⏱ TIME'}  ")
-        self.toolbar_domain_lbl.setStyleSheet(
-            f"color: {col}; font-weight: 800; font-size: 12px; padding: 0 8px; "
-            f"border: 1px solid {col}; border-radius: 3px;")
         self.lbl_current_domain.setText(
             f"Domain: {'Depth (m)' if self.depth_mode else 'Time (ms)'}")
 
@@ -1815,7 +1826,15 @@ class SeisLabApp(QMainWindow):
     def show_attributes_tab(self):
         if self.current_data is not None:
             sr = self.segy_loader.sample_rate if self.segy_loader else None
-            self.attribute_panel.set_data(self.current_data, sample_rate_ms=sr, sample_axis=1)
+            self.attribute_panel.set_data(
+                self.current_data,
+                sample_rate_ms=sr,
+                sample_axis=1,
+                volume=self.segy_loader.data if self.segy_loader is not None else None,
+                inline_index=self.current_inline,
+                crossline_index=self.current_crossline,
+                timeslice_index=self.current_timeslice,
+            )
         self.tabs.setCurrentWidget(self.attribute_panel)
 
     def show_processing_tab(self):
