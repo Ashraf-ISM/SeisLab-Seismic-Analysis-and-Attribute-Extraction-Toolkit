@@ -58,3 +58,6 @@ example_*.png
 *.nc
 *.segy
 *.sgy
+*.nc
+*.segy
+*.sgy
