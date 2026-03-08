@@ -50,7 +50,7 @@ TEXT_LIGHT = "#1f2937"
 TEXT_DIM   = "#5f6b7a"
 GRID_CLR   = "#d5dbe5"
 TRACK_COLORS = [
-    "#00bfff", "#ff6b35", "#4caf50", "#ffeb3b",
+    "#d98aec", "#ff6b35", "#4caf50", "#ffeb3b",
     "#e91e63", "#9c27b0", "#00e5ff", "#ff9800",
     "#76ff03", "#f44336"
 ]
@@ -374,33 +374,123 @@ class WellExplorer(QDockWidget):
         self.btn_remove.clicked.connect(self.remove_selected)
         self.tree.itemClicked.connect(self._on_item_click)
 
+    # def add_well(self, well: WellData):
+    #     self.wells[well.name] = well
+    #     root = QTreeWidgetItem(self.tree, [well.name, ""])
+    #     root.setData(0, Qt.UserRole, ('well', well.name))
+    #     root.setForeground(0, QColor(ACCENT))
+    #     root.setFont(0, QFont("Segoe UI", 9, QFont.Bold))
+
+    #     # Depth info
+    #     if well.depth_col:
+    #         d = well.df[well.depth_col].dropna()
+    #         if len(d):
+    #             info = QTreeWidgetItem(root, [f"  Depth: {d.min():.1f}–{d.max():.1f}", "m"])
+    #             info.setForeground(0, QColor(TEXT_DIM))
     def add_well(self, well: WellData):
+
         self.wells[well.name] = well
+    
         root = QTreeWidgetItem(self.tree, [well.name, ""])
         root.setData(0, Qt.UserRole, ('well', well.name))
         root.setForeground(0, QColor(ACCENT))
         root.setFont(0, QFont("Segoe UI", 9, QFont.Bold))
-
+    
         # Depth info
         if well.depth_col:
             d = well.df[well.depth_col].dropna()
             if len(d):
                 info = QTreeWidgetItem(root, [f"  Depth: {d.min():.1f}–{d.max():.1f}", "m"])
                 info.setForeground(0, QColor(TEXT_DIM))
-
-        # Curves group
-        curves_node = QTreeWidgetItem(root, ["📊 Curves", ""])
+    
+        # ── Curves group ──────────────────────────────────────────────────────────
+        curves_node = QTreeWidgetItem(root, [""])
         curves_node.setForeground(0, QColor(TEXT_DIM))
+    
+        # Custom header widget for the curves node
+        curves_header = QWidget()
+        curves_header.setStyleSheet("background: transparent;")
+        curves_layout = QHBoxLayout(curves_header)
+        curves_layout.setContentsMargins(4, 6, 4, 6)
+        curves_layout.setSpacing(8)
+    
+        # Icon label
+        icon_lbl = QLabel("📊")
+        icon_lbl.setFont(QFont("Segoe UI Emoji", 14))
+        icon_lbl.setStyleSheet("background: transparent;")
+    
+        # Title label
+        title_lbl = QLabel("Curves")
+        title_lbl.setFont(QFont("Segoe UI Semibold", 13, QFont.Bold))
+        title_lbl.setStyleSheet(f"color: {TEXT_DIM}; background: transparent; letter-spacing: 1px;")
+    
+        # Count badge
+        curve_count = sum(1 for col in well.curve_names if col != well.depth_col)
+        badge_lbl = QLabel(f"  {curve_count}  ")
+        badge_lbl.setFont(QFont("Segoe UI", 9, QFont.Bold))
+        badge_lbl.setStyleSheet(
+            "background: rgba(100,120,160,0.35);"
+            "color: #aabbdd;"
+            "border-radius: 8px;"
+            "padding: 1px 4px;"
+        )
+    
+        curves_layout.addWidget(icon_lbl)
+        curves_layout.addWidget(title_lbl)
+        curves_layout.addWidget(badge_lbl)
+        curves_layout.addStretch()
+    
+        self.tree.setItemWidget(curves_node, 0, curves_header)
+    
+        # ── Individual curve children ─────────────────────────────────────────────
         for i, col in enumerate(well.curve_names):
             if col == well.depth_col:
                 continue
-            unit = well.curves.get(col, {}).get('unit', '')
-            child = QTreeWidgetItem(curves_node, [f"  {col}", unit])
+    
+            unit      = well.curves.get(col, {}).get('unit', '')
+            col_color = TRACK_COLORS[i % len(TRACK_COLORS)]
+    
+            child = QTreeWidgetItem(curves_node, ["", unit])
             child.setData(0, Qt.UserRole, ('curve', well.name, col))
-            child.setForeground(0, QColor(TRACK_COLORS[i % len(TRACK_COLORS)]))
-
+            child.setSizeHint(0, QSize(0, 32))
+    
+            # Unit column styling
+            child.setFont(1, QFont("Consolas", 10))
+            child.setForeground(1, QColor("#667799"))
+    
+            # Custom row widget: colour swatch + name
+            row_widget = QWidget()
+            row_widget.setStyleSheet("background: transparent;")
+            row_layout = QHBoxLayout(row_widget)
+            row_layout.setContentsMargins(10, 2, 4, 2)
+            row_layout.setSpacing(8)
+    
+            # Colour swatch
+            swatch = QLabel()
+            swatch.setFixedSize(10, 10)
+            swatch.setStyleSheet(
+                f"background-color: {col_color};"
+                "border-radius: 5px;"
+                "min-width: 10px; min-height: 10px;"
+            )
+    
+            # Curve name label — large, readable
+            name_lbl = QLabel(col)
+            name_lbl.setFont(QFont("Segoe UI", 12))
+            name_lbl.setStyleSheet(
+                f"color: {col_color};"
+                "background: transparent;"
+            )
+    
+            row_layout.addWidget(swatch)
+            row_layout.addWidget(name_lbl)
+            row_layout.addStretch()
+    
+            self.tree.setItemWidget(child, 0, row_widget)
+    
         root.setExpanded(True)
         curves_node.setExpanded(True)
+            #
 
     def rebuild_tree(self):
         wells = list(self.wells.values())
@@ -1096,19 +1186,20 @@ class WellLogViewer(QMainWindow):
 
         # 4. Multi-track
         self.track_canvas = MultiTrackPlot()
-        self.tabs.addTab(self.track_canvas, "📈 Multi-Track")
+        self.tabs.addTab(self.track_canvas, QIcon("/home/ashraf/Downloads/seislab/seislab/icons/multi-track.png"), " Multi-Track")
 
         # 5. Triple Combo
         self.triple_canvas = TripleComboPlot()
-        self.tabs.addTab(self.triple_canvas, "🔗 Triple Combo")
+        self.tabs.addTab(self.triple_canvas, QIcon("/home/ashraf/Downloads/seislab/seislab/icons/triple-combo.png"), " Triple Combo")
 
         # 6. Histogram
         self.hist_canvas = HistogramPlot()
-        self.tabs.addTab(self.hist_canvas, "📉 Histogram")
+        # self.tabs.addTab(self.hist_canvas, "📉  Histogram")
+        self.tabs.addTab(self.hist_canvas, QIcon("/home/ashraf/Downloads/seislab/seislab/icons/histogram.png"), "Histogram")
 
         # 7. Cross Plot
         self.xplot_canvas = CrossPlot()
-        self.tabs.addTab(self.xplot_canvas, "✖ Cross Plot")
+        self.tabs.addTab(self.xplot_canvas,QIcon("../icons/cross-plot.png"), "✖ Cross Plot")
 
         # Controls per tab
         self.track_ctrl = MultiTrackControls()
@@ -1147,12 +1238,15 @@ class WellLogViewer(QMainWindow):
         wm.addAction("Restore", self._restore_window)
         wm.addAction("Toggle Full Screen", self._toggle_fullscreen, "F11")
 
-        # Facies classification workflows
-        facies_menu = mb.addMenu("&Facies")
-        facies_menu.addAction("Run Facies Classification", self._run_facies)
-        facies_menu.addAction("Supervised Classification", self._supervised_facies)
-        facies_menu.addAction("Unsupervised Classification", self._unsupervised_facies)
-        facies_menu.addSeparator()
+        # Facies classification menu (placeholder for future feature) with supervised and unsupervised options
+        fm = mb.addMenu("&Facies")
+        fm.addAction("Run Facies Classification", self._run_facies)   
+        fm.addAction("Supervised Classification", self._supervised_facies)
+        fm.addAction("Unsupervised Classification", self._unsupervised_facies)
+        fm.addSeparator()
+        
+        
+        
 
         hm = mb.addMenu("&Help")
         hm.addAction("About",            self._about)
@@ -1256,6 +1350,18 @@ class WellLogViewer(QMainWindow):
         if not self.current_well or not curve:
             return
         self.hist_canvas.plot(self.current_well, curve, bins, log_scale)
+    
+    def _plot_histogram(self, curve, bins, log_scale):
+
+        if not self.current_well or not curve:
+            return
+    
+        self.hist_canvas.plot(
+            self.current_well,
+            curve,
+            bins=bins,
+            log_scale=log_scale,
+        )
 
     def _plot_crossplot(self, x, y, col, sz):
         if not self.current_well or not x or not y:

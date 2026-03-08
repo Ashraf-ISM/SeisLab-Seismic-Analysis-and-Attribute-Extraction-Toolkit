@@ -754,16 +754,12 @@ class SeisLabApp(QMainWindow):
 
         self.left_panel   = self._build_left_panel()
         self.center_panel = self._build_center_panel()
-        self.right_panel  = self._build_right_panel()
 
         self.main_splitter.addWidget(self.left_panel)
         self.main_splitter.addWidget(self.center_panel)
-        self.main_splitter.addWidget(self.right_panel)
         self.main_splitter.setStretchFactor(0, 1)
-        self.main_splitter.setStretchFactor(1, 6)
-        self.main_splitter.setStretchFactor(2, 2)
-        self.main_splitter.setSizes([280, 1260, 380])
-        self._standard_main_sizes = [280, 1260, 380]
+        self.main_splitter.setStretchFactor(1, 8)
+        self.main_splitter.setSizes([280, 1640])
         self._standard_center_sizes = [860, 120]
 
         root.addWidget(self.main_splitter)
@@ -874,7 +870,7 @@ class SeisLabApp(QMainWindow):
         self.tabs.setTabPosition(QTabWidget.North)
         self.tabs.setDocumentMode(True)
 
-        self.seismic_viewer      = SeismicViewer()
+        self.viewport_panel      = self._build_viewport_panel()
         self.attribute_panel     = AttributePanel()
         self.processing_panel    = ProcessingPanel()
         self.interpretation_panel= InterpretationPanel()
@@ -882,7 +878,7 @@ class SeisLabApp(QMainWindow):
         # Mini matplotlib canvas for depth-converted preview
         self.depth_viewer_widget = self._build_depth_viewer()
 
-        self.tabs.addTab(self.seismic_viewer,        "🖥  Viewport")
+        self.tabs.addTab(self.viewport_panel,        "🖥  Viewport")
         self.tabs.addTab(self.attribute_panel,       "⚡  Attributes")
         self.tabs.addTab(self.processing_panel,      "⚙  Processing")
         self.tabs.addTab(self.interpretation_panel,  "✎  Interpretation")
@@ -944,6 +940,27 @@ class SeisLabApp(QMainWindow):
         layout.addWidget(vsplit)
         return panel
 
+    def _build_viewport_panel(self):
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self.viewport_splitter = QSplitter(Qt.Horizontal)
+        self.viewport_splitter.setChildrenCollapsible(False)
+
+        self.seismic_viewer = SeismicViewer()
+        self.viewport_controls = self._build_viewport_controls()
+
+        self.viewport_splitter.addWidget(self.seismic_viewer)
+        self.viewport_splitter.addWidget(self.viewport_controls)
+        self.viewport_splitter.setStretchFactor(0, 6)
+        self.viewport_splitter.setStretchFactor(1, 2)
+        self.viewport_splitter.setSizes([1180, 360])
+
+        layout.addWidget(self.viewport_splitter)
+        return panel
+
     def _build_depth_viewer(self):
         """Minimal depth-domain viewer placeholder."""
         w = QWidget()
@@ -965,8 +982,8 @@ class SeisLabApp(QMainWindow):
         lay.addWidget(self.depth_canvas)
         return w
 
-    # ── RIGHT PANEL ────────────────────────────
-    def _build_right_panel(self):
+    # ── VIEWPORT CONTROLS ──────────────────────
+    def _build_viewport_controls(self):
         panel = QWidget(); panel.setMinimumWidth(320); panel.setMaximumWidth(420)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(6, 6, 6, 6)
@@ -1341,26 +1358,15 @@ class SeisLabApp(QMainWindow):
 
         attr_mode = self.tabs.widget(index) is self.attribute_panel
         if attr_mode:
-            sizes = self.main_splitter.sizes()
-            if len(sizes) == 3 and sizes[2] > 0:
-                self._standard_main_sizes = sizes
-
             center_sizes = self.center_splitter.sizes()
             if len(center_sizes) == 2 and center_sizes[1] > 0:
                 self._standard_center_sizes = center_sizes
 
-            self.right_panel.hide()
             self.bottom_panel.hide()
-
-            left_size = self._standard_main_sizes[0]
-            center_size = self._standard_main_sizes[1] + self._standard_main_sizes[2]
-            self.main_splitter.setSizes([left_size, center_size, 0])
             self.center_splitter.setSizes([1, 0])
             return
 
-        self.right_panel.show()
         self.bottom_panel.show()
-        self.main_splitter.setSizes(self._standard_main_sizes)
         self.center_splitter.setSizes(self._standard_center_sizes)
 
     # ──────────────────────────────────────────

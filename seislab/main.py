@@ -5,42 +5,32 @@ Main Application Entry Point
 """
 
 import sys
-import time
 
 from PyQt5.QtWidgets import QApplication, QSplashScreen
 from PyQt5.QtGui import QIcon, QPixmap
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 
 from gui.main_window import SeisLabApp
 
 
 def main():
-    """Initialize and run the SeisLab application."""
 
-    # Enable High DPI scaling (important for modern displays)
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
 
-    # Application metadata
     app.setApplicationName("SeisLab")
     app.setOrganizationName("SeisLab")
 
-    # Set application style
     app.setStyle("Fusion")
 
-    # -------------------------------
-    # Set App Icon
-    # -------------------------------
+    # App icon
     app_icon = QIcon("images/seislab.png")
     app.setWindowIcon(app_icon)
 
-    # -------------------------------
-    # Splash Screen (Startup Logo)
-    # -------------------------------
+    # Splash screen
     splash_pix = QPixmap("images/seislab.png")
-
     splash = QSplashScreen(splash_pix, Qt.WindowStaysOnTopHint)
     splash.setWindowFlag(Qt.FramelessWindowHint)
     splash.show()
@@ -50,23 +40,22 @@ def main():
         Qt.AlignBottom | Qt.AlignCenter,
         Qt.white
     )
+    splash.showMessage("Loading seismic modules...")
+    splash.showMessage("Initializing attribute engine...")
+    splash.showMessage("Preparing GUI...")
 
-    # Process events so splash appears immediately
     app.processEvents()
 
-    # Simulated loading delay (optional)
-    time.sleep(0.005)
-
-    # -------------------------------
-    # Main Window
-    # -------------------------------
+    # Create main window
     window = SeisLabApp()
     window.setWindowIcon(app_icon)
 
-    window.show()
+    # Show main window after 3 seconds
+    def start_main():
+        window.show()
+        splash.finish(window)
 
-    # Close splash after window loads
-    splash.finish(window)
+    QTimer.singleShot(3000, start_main)   # 3000 ms = 3 seconds
 
     sys.exit(app.exec_())
 
