@@ -48,3 +48,13 @@ example_*.png
 
 # Logs
 *.log
+
+# Large seismic data
+*.nc
+*.segy
+*.sgy
+*.su
+*.h5
+*.nc
+*.segy
+*.sgy
