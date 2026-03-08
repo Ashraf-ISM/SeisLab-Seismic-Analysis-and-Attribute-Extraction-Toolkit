@@ -314,6 +314,66 @@ def load_csv(filepath) -> WellData:
     return well
 
 
+def detect_well_format(filepath):
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext == '.las':
+        return 'las'
+    if ext in ('.csv', '.txt'):
+        return 'csv'
+    return None
+
+
+def ensure_well_list(wells):
+    if wells is None:
+        return []
+    if isinstance(wells, WellData):
+        return [wells]
+    return [well for well in wells if well is not None]
+
+
+def available_curve_names(wells, mode='union'):
+    wells = ensure_well_list(wells)
+    if not wells:
+        return []
+
+    ordered = []
+    curve_sets = []
+    for well in wells:
+        curves = [curve for curve in well.curve_names if curve != well.depth_col]
+        curve_sets.append(set(curves))
+        for curve in curves:
+            if curve not in ordered:
+                ordered.append(curve)
+
+    if mode == 'intersection' and curve_sets:
+        shared = set.intersection(*curve_sets)
+        return [curve for curve in ordered if curve in shared]
+
+    return ordered
+
+
+def depth_limits_for_wells(wells):
+    mins = []
+    maxs = []
+    for well in ensure_well_list(wells):
+        if well.depth_col and well.depth_col in well.df:
+            depth = well.df[well.depth_col].dropna()
+            if not depth.empty:
+                mins.append(float(depth.min()))
+                maxs.append(float(depth.max()))
+
+    if not mins:
+        return 0.0, 99999.0
+    return min(mins), max(maxs)
+
+
+def summarize_well_names(wells, limit=4):
+    names = [well.name for well in ensure_well_list(wells)]
+    if len(names) <= limit:
+        return ", ".join(names)
+    return ", ".join(names[:limit]) + f", +{len(names) - limit} more"
+
+
 # ─────────────────────────────────────────────
 #  CANVAS WRAPPER
 # ─────────────────────────────────────────────
@@ -340,6 +400,7 @@ class PlotCanvas(QWidget):
 class WellExplorer(QDockWidget):
     well_selected   = pyqtSignal(object)       # WellData
     curve_selected  = pyqtSignal(object, str)  # WellData, curve
+    well_removed    = pyqtSignal(str)          # well name
 
     def __init__(self, parent=None):
         super().__init__("Well Explorer", parent)
@@ -354,10 +415,12 @@ class WellExplorer(QDockWidget):
         btn_row = QHBoxLayout()
         self.btn_load_las = QPushButton("+ LAS")
         self.btn_load_csv = QPushButton("+ CSV")
+        self.btn_load_multi = QPushButton("+ Multi")
         self.btn_remove   = QPushButton("Remove")
         self.btn_remove.setObjectName("secondary")
         btn_row.addWidget(self.btn_load_las)
         btn_row.addWidget(self.btn_load_csv)
+        btn_row.addWidget(self.btn_load_multi)
         btn_row.addWidget(self.btn_remove)
         layout.addLayout(btn_row)
 
@@ -371,8 +434,19 @@ class WellExplorer(QDockWidget):
 
         self.btn_load_las.clicked.connect(lambda: parent.load_file('las') if parent else None)
         self.btn_load_csv.clicked.connect(lambda: parent.load_file('csv') if parent else None)
+        self.btn_load_multi.clicked.connect(lambda: parent.load_file('mixed', multiple=True) if parent else None)
         self.btn_remove.clicked.connect(self.remove_selected)
         self.tree.itemClicked.connect(self._on_item_click)
+
+    def unique_well_name(self, name):
+        base_name = (name or "").strip() or "Untitled Well"
+        if base_name not in self.wells:
+            return base_name
+
+        suffix = 2
+        while f"{base_name} ({suffix})" in self.wells:
+            suffix += 1
+        return f"{base_name} ({suffix})"
 
     # def add_well(self, well: WellData):
     #     self.wells[well.name] = well
@@ -388,6 +462,7 @@ class WellExplorer(QDockWidget):
     #             info = QTreeWidgetItem(root, [f"  Depth: {d.min():.1f}–{d.max():.1f}", "m"])
     #             info.setForeground(0, QColor(TEXT_DIM))
     def add_well(self, well: WellData):
+        well.name = self.unique_well_name(well.name or os.path.basename(well.filename))
 
         self.wells[well.name] = well
     
@@ -487,10 +562,10 @@ class WellExplorer(QDockWidget):
             row_layout.addStretch()
     
             self.tree.setItemWidget(child, 0, row_widget)
-    
+
         root.setExpanded(True)
         curves_node.setExpanded(True)
-            #
+        return well
 
     def rebuild_tree(self):
         wells = list(self.wells.values())
@@ -499,17 +574,40 @@ class WellExplorer(QDockWidget):
         for well in wells:
             self.add_well(well)
 
+    def select_well(self, well_name):
+        for idx in range(self.tree.topLevelItemCount()):
+            item = self.tree.topLevelItem(idx)
+            data = item.data(0, Qt.UserRole)
+            if data and data[0] == 'well' and data[1] == well_name:
+                self.tree.setCurrentItem(item)
+                self.tree.scrollToItem(item)
+                return
+
     def remove_selected(self):
         items = self.tree.selectedItems()
         if not items:
             return
         item = items[0]
         data = item.data(0, Qt.UserRole)
-        if data and data[0] == 'well':
+        if not data:
+            return
+
+        if data[0] == 'well':
             wname = data[1]
-            self.wells.pop(wname, None)
-            idx = self.tree.indexOfTopLevelItem(item)
+            root_item = item
+        elif data[0] == 'curve':
+            wname = data[1]
+            root_item = item
+            while root_item.parent() is not None:
+                root_item = root_item.parent()
+        else:
+            return
+
+        removed = self.wells.pop(wname, None)
+        if removed is not None:
+            idx = self.tree.indexOfTopLevelItem(root_item)
             self.tree.takeTopLevelItem(idx)
+            self.well_removed.emit(wname)
 
     def _on_item_click(self, item, col):
         data = item.data(0, Qt.UserRole)
@@ -540,6 +638,8 @@ class HeaderTab(QWidget):
         layout.addWidget(self.table)
 
     def load(self, well: WellData):
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["Mnemonic", "Value", "Unit", "Description"])
         self.table.setRowCount(0)
         if not well.header:
             # CSV – show basic info
@@ -565,6 +665,42 @@ class HeaderTab(QWidget):
                 item = QTableWidgetItem(str(txt))
                 item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
                 self.table.setItem(r, c, item)
+
+    def load_comparison(self, wells):
+        rows = []
+        for well in ensure_well_list(wells):
+            depth_min = ""
+            depth_max = ""
+            step = ""
+            if well.depth_col and well.depth_col in well.df:
+                depth = well.df[well.depth_col].dropna()
+                if not depth.empty:
+                    depth_min = f"{depth.min():.2f}"
+                    depth_max = f"{depth.max():.2f}"
+                    step = f"{(depth.max() - depth.min()) / max(len(depth) - 1, 1):.4f}"
+
+            rows.extend([
+                (well.name, "FILE", os.path.basename(well.filename), "", "Source file"),
+                (well.name, "CURVES", str(len([curve for curve in well.curve_names if curve != well.depth_col])), "", "Curve count"),
+                (well.name, "DEPTH", well.depth_col or "", "", "Depth column"),
+                (well.name, "STRT", depth_min, "m" if depth_min else "", "Start depth"),
+                (well.name, "STOP", depth_max, "m" if depth_max else "", "Stop depth"),
+                (well.name, "STEP", step, "m" if step else "", "Average step"),
+            ])
+
+        self.table.clearContents()
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["Well", "Metric", "Value", "Unit", "Description"])
+        self.table.setRowCount(len(rows))
+        for r, row in enumerate(rows):
+            for c, txt in enumerate(row):
+                item = QTableWidgetItem(str(txt))
+                item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                self.table.setItem(r, c, item)
+
+    def clear_view(self):
+        self.table.clearContents()
+        self.table.setRowCount(0)
 
 
 # ─────────────────────────────────────────────
@@ -596,6 +732,38 @@ class StatsTab(QWidget):
                     item.setForeground(QColor(ACCENT))
                 self.table.setItem(r, c, item)
 
+    def load_comparison(self, wells):
+        frames = []
+        for well in ensure_well_list(wells):
+            if well.df.empty:
+                continue
+            stats_df = well.df.describe().T.round(4).reset_index().rename(columns={'index': 'Curve'})
+            stats_df.insert(0, 'Well', well.name)
+            frames.append(stats_df)
+
+        if not frames:
+            self.clear_view()
+            return
+
+        display_df = pd.concat(frames, ignore_index=True)
+        self.table.clearContents()
+        self.table.setRowCount(len(display_df))
+        self.table.setColumnCount(len(display_df.columns))
+        self.table.setHorizontalHeaderLabels([str(column) for column in display_df.columns])
+        self.table.setVerticalHeaderLabels([str(idx + 1) for idx in range(len(display_df))])
+        for r, row in enumerate(display_df.itertuples(index=False, name=None)):
+            for c, val in enumerate(row):
+                item = QTableWidgetItem("" if pd.isna(val) else str(val))
+                item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                if r % 2 == 0:
+                    item.setForeground(QColor(ACCENT))
+                self.table.setItem(r, c, item)
+
+    def clear_view(self):
+        self.table.clearContents()
+        self.table.setRowCount(0)
+        self.table.setColumnCount(0)
+
 
 # ─────────────────────────────────────────────
 #  RAW DATA TAB
@@ -620,6 +788,41 @@ class DataTab(QWidget):
                 item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
                 self.table.setItem(r - df.index[0], c, item)
 
+    def load_comparison(self, wells):
+        wells = ensure_well_list(wells)
+        if not wells:
+            self.clear_view()
+            return
+
+        rows_per_well = max(20, 500 // max(len(wells), 1))
+        frames = []
+        for well in wells:
+            sample = well.df.head(rows_per_well).copy()
+            if sample.empty:
+                continue
+            sample.insert(0, "WELL", well.name)
+            frames.append(sample)
+
+        if not frames:
+            self.clear_view()
+            return
+
+        df = pd.concat(frames, ignore_index=True, sort=False)
+        self.table.clearContents()
+        self.table.setRowCount(len(df))
+        self.table.setColumnCount(len(df.columns))
+        self.table.setHorizontalHeaderLabels(list(df.columns))
+        for r, row in df.iterrows():
+            for c, val in enumerate(row):
+                item = QTableWidgetItem("" if pd.isna(val) else f"{val:.4g}" if isinstance(val, float) else str(val))
+                item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                self.table.setItem(r, c, item)
+
+    def clear_view(self):
+        self.table.clearContents()
+        self.table.setRowCount(0)
+        self.table.setColumnCount(0)
+
 
 # ─────────────────────────────────────────────
 #  MULTI-TRACK PLOT
@@ -628,17 +831,32 @@ class MultiTrackPlot(PlotCanvas):
     def __init__(self, parent=None):
         super().__init__(parent, figsize=(14, 10))
 
-    def plot(self, well: WellData, selected_curves=None, depth_range=None):
+    def plot(self, wells, selected_curves=None, depth_range=None):
         self.fig.clear()
-        if well.df.empty or well.depth_col is None:
+        wells = [
+            well for well in ensure_well_list(wells)
+            if not well.df.empty and well.depth_col is not None and well.depth_col in well.df
+        ]
+        if not wells:
             self.canvas.draw()
             return
 
-        depth = well.df[well.depth_col].values
-        curves = selected_curves or [c for c in well.curve_names if c != well.depth_col]
+        curves = selected_curves or available_curve_names(wells, mode='intersection')
+        if not curves:
+            curves = available_curve_names(wells, mode='union')
         curves = curves[:10]
         if not curves:
+            self.canvas.draw()
             return
+
+        if len(wells) == 1:
+            self._plot_single_well(wells[0], curves, depth_range)
+        else:
+            self._plot_compare_wells(wells, curves, depth_range)
+        self.canvas.draw()
+
+    def _plot_single_well(self, well, curves, depth_range):
+        depth = well.df[well.depth_col].values
 
         n = len(curves)
         axes = self.fig.subplots(1, n, sharey=True)
@@ -678,7 +896,57 @@ class MultiTrackPlot(PlotCanvas):
             x_min = np.nanmin(vals) if valid.any() else 0
             ax.fill_betweenx(d[valid], x_min, vals[valid], alpha=0.15, color=color)
 
-        self.canvas.draw()
+    def _plot_compare_wells(self, wells, curves, depth_range):
+        rows = len(wells)
+        cols = len(curves)
+        self.fig.set_size_inches(max(12, cols * 2.8), max(8, rows * 2.8))
+        axes = self.fig.subplots(rows, cols, squeeze=False, sharey='row')
+        self.fig.subplots_adjust(wspace=0.08, hspace=0.18, left=0.08, right=0.99, top=0.93, bottom=0.05)
+        self.fig.suptitle(
+            f"Multi-Track Compare  |  {summarize_well_names(wells)}",
+            color=ACCENT,
+            fontsize=fs(11),
+            fontweight='bold',
+        )
+
+        for row, well in enumerate(wells):
+            depth = well.df[well.depth_col].values
+            if depth_range:
+                mask = (depth >= depth_range[0]) & (depth <= depth_range[1])
+            else:
+                mask = np.ones(len(depth), dtype=bool)
+            d = depth[mask]
+
+            for col, curve in enumerate(curves):
+                ax = axes[row][col]
+                ax.set_facecolor(PANEL_BG)
+                ax.tick_params(axis='x', labelsize=fs(6), colors=TEXT_DIM)
+                ax.tick_params(axis='y', labelsize=fs(6), colors=TEXT_DIM)
+                ax.xaxis.set_label_position('top')
+                ax.xaxis.tick_top()
+                ax.invert_yaxis()
+
+                if row == 0:
+                    ax.set_title(curve, color=TRACK_COLORS[col % len(TRACK_COLORS)], fontsize=fs(8), fontweight='bold', pad=4)
+                if col == 0:
+                    ax.set_ylabel(f"{well.name}\nDepth (m)", color=TEXT_DIM, fontsize=fs(8))
+
+                if curve not in well.df.columns:
+                    ax.text(0.5, 0.5, "n/a", transform=ax.transAxes, ha='center', va='center', color=TEXT_DIM)
+                    continue
+
+                vals = well.df[curve].values[mask]
+                color = TRACK_COLORS[col % len(TRACK_COLORS)]
+                valid = np.isfinite(vals)
+                if not valid.any():
+                    ax.text(0.5, 0.5, "empty", transform=ax.transAxes, ha='center', va='center', color=TEXT_DIM)
+                    continue
+
+                ax.plot(vals[valid], d[valid], color=color, linewidth=0.8)
+                unit = well.curves.get(curve, {}).get('unit', '')
+                ax.set_xlabel(f"{curve} [{unit}]" if unit else curve, fontsize=fs(6), color=TEXT_DIM)
+                x_min = np.nanmin(vals[valid]) if valid.any() else 0.0
+                ax.fill_betweenx(d[valid], x_min, vals[valid], alpha=0.12, color=color)
 
 
 # ─────────────────────────────────────────────
@@ -708,26 +976,48 @@ class TripleComboPlot(PlotCanvas):
     def __init__(self, parent=None):
         super().__init__(parent, figsize=(14, 10))
 
-    def plot(self, well: WellData, depth_range=None):
+    def plot(self, wells, depth_range=None):
         self.fig.clear()
-        if well.df.empty:
+        wells = [
+            well for well in ensure_well_list(wells)
+            if not well.df.empty and well.depth_col is not None and well.depth_col in well.df
+        ]
+        if not wells:
             self.canvas.draw()
             return
 
+        if len(wells) == 1:
+            self.fig.set_size_inches(14, 10)
+            self.fig.suptitle(f"Triple Combo  |  {wells[0].name}", color=ACCENT,
+                              fontsize=fs(11), fontweight='bold')
+            gs = gridspec.GridSpec(1, 3, figure=self.fig, wspace=0.08,
+                                   left=0.07, right=0.99, top=0.90, bottom=0.05)
+            axes = [self.fig.add_subplot(gs[0, i]) for i in range(3)]
+            self._plot_well_row(axes, wells[0], depth_range, show_titles=True)
+        else:
+            row_count = len(wells)
+            self.fig.set_size_inches(14, max(10, row_count * 3.6))
+            self.fig.suptitle(
+                f"Triple Combo Compare  |  {summarize_well_names(wells)}",
+                color=ACCENT,
+                fontsize=fs(11),
+                fontweight='bold',
+            )
+            gs = gridspec.GridSpec(row_count, 3, figure=self.fig, wspace=0.08, hspace=0.18,
+                                   left=0.08, right=0.99, top=0.94, bottom=0.05)
+            for row, well in enumerate(wells):
+                axes = [self.fig.add_subplot(gs[row, i]) for i in range(3)]
+                self._plot_well_row(axes, well, depth_range, show_titles=(row == 0))
+
+        self.canvas.draw()
+
+    def _plot_well_row(self, axes, well, depth_range=None, show_titles=True):
         depth = well.df[well.depth_col].values
         if depth_range:
             mask = (depth >= depth_range[0]) & (depth <= depth_range[1])
         else:
             mask = np.ones(len(depth), dtype=bool)
         d = depth[mask]
-
-        gs = gridspec.GridSpec(1, 3, figure=self.fig, wspace=0.08,
-                               left=0.07, right=0.99, top=0.90, bottom=0.05)
-
-        self.fig.suptitle(f"Triple Combo  |  {well.name}", color=ACCENT,
-                          fontsize=fs(11), fontweight='bold')
-
-        axes = [self.fig.add_subplot(gs[0, i]) for i in range(3)]
         for ax in axes:
             ax.set_facecolor(PANEL_BG)
             ax.invert_yaxis()
@@ -749,8 +1039,8 @@ class TripleComboPlot(PlotCanvas):
             axes[0].set_xlabel(f"{gr_curve} ({unit})", color="#00a83b", fontsize=fs(7))
         else:
             axes[0].set_xlabel("GR (API)", color="#00a83b", fontsize=fs(7))
-        axes[0].set_title("Correlation", color=TEXT_LIGHT, fontsize=fs(8), pad=2)
-        axes[0].set_ylabel("Depth (m)", color=TEXT_DIM, fontsize=fs(8))
+        axes[0].set_title("Correlation" if show_titles else "", color=TEXT_LIGHT, fontsize=fs(8), pad=2)
+        axes[0].set_ylabel(f"{well.name}\nDepth (m)", color=TEXT_DIM, fontsize=fs(8))
 
         # ---- Track 1 : Resistivity
         res_deep = find_curve(well, TRIPLE_PRESETS['RES_DEEP'])
@@ -777,7 +1067,7 @@ class TripleComboPlot(PlotCanvas):
             axes[1].set_xlim(lo, hi)
         else:
             axes[1].set_xlim(0.2, 200)
-        axes[1].set_title("Resistivity", color=TEXT_LIGHT, fontsize=fs(8), pad=2)
+        axes[1].set_title("Resistivity" if show_titles else "", color=TEXT_LIGHT, fontsize=fs(8), pad=2)
         axes[1].set_xlabel("RT (ohm.m)", color="#f44336", fontsize=fs(7))
 
         # ---- Track 2 : Nuclear (RHOB + NPHI with independent x-axes)
@@ -825,6 +1115,8 @@ class TripleComboPlot(PlotCanvas):
                     axes[2].fill_betweenx(d[good], r[good], nr, where=(r[good] > nr), color="#ffeb3b", alpha=0.28)
 
         axes[2].set_title("Nuclear", color=TEXT_LIGHT, fontsize=fs(8), pad=2)
+        if not show_titles:
+            axes[2].set_title("", color=TEXT_LIGHT, fontsize=fs(8), pad=2)
 
         for ax in axes[:2]:
             if ax.lines:
@@ -836,8 +1128,6 @@ class TripleComboPlot(PlotCanvas):
             l.extend(l2)
         if h:
             axes[2].legend(h, l, loc='best', fontsize=fs(6), framealpha=0.85)
-
-        self.canvas.draw()
 
     def _plot_curve(self, ax, well, d, mask, preset_key, color, log=False, fill=False, label=None):
         c = find_curve(well, TRIPLE_PRESETS.get(preset_key, [preset_key]))
@@ -880,50 +1170,90 @@ class HistogramPlot(PlotCanvas):
     def __init__(self, parent=None):
         super().__init__(parent, figsize=(10, 7))
 
-    def plot(self, well: WellData, curve: str, bins=50, log_scale=False):
+    def plot(self, wells, curve: str, bins=50, log_scale=False):
         self.fig.clear()
-        if curve not in well.df.columns:
+        wells = [well for well in ensure_well_list(wells) if curve in well.df.columns]
+        if not wells:
             self.canvas.draw()
             return
 
-        vals = well.df[curve].dropna().values
         ax = self.fig.add_subplot(111)
-        color = TRACK_COLORS[0]
-
-        n, bins_out, patches = ax.hist(vals, bins=bins, color=color, alpha=0.75,
-                                        edgecolor=DARK_BG, linewidth=0.5)
-        # KDE
-        if len(vals) > 5:
-            from scipy.stats import gaussian_kde
-            kde = gaussian_kde(vals)
-            xs = np.linspace(vals.min(), vals.max(), 300)
-            ax2 = ax.twinx()
-            ax2.plot(xs, kde(xs), color=ACCENT2, linewidth=1.5, label='KDE')
-            ax2.set_ylabel("Density", color=ACCENT2, fontsize=fs(9))
-            ax2.tick_params(axis='y', colors=ACCENT2, labelsize=fs(7))
-            ax2.set_facecolor(PANEL_BG)
-
-        if log_scale:
-            ax.set_yscale('log')
-
         ax.tick_params(axis='both', labelsize=fs(8), colors=TEXT_DIM)
-        unit = well.curves.get(curve, {}).get('unit', '')
+        unit = wells[0].curves.get(curve, {}).get('unit', '')
         ax.set_xlabel(f"{curve}  [{unit}]" if unit else curve, color=TEXT_LIGHT, fontsize=fs(10))
-        ax.set_ylabel("Count", color=TEXT_LIGHT, fontsize=fs(10))
-        ax.set_title(f"Histogram  –  {curve}  |  {well.name}", color=ACCENT,
-                     fontsize=fs(11), fontweight='bold')
 
-        # Stats annotation
-        txt = (f"n = {len(vals):,}\n"
-               f"μ = {np.mean(vals):.4g}\n"
-               f"σ = {np.std(vals):.4g}\n"
-               f"P10 = {np.percentile(vals,10):.4g}\n"
-               f"P50 = {np.percentile(vals,50):.4g}\n"
-               f"P90 = {np.percentile(vals,90):.4g}")
-        ax.text(0.98, 0.97, txt, transform=ax.transAxes, fontsize=fs(8),
-                verticalalignment='top', horizontalalignment='right',
-                color=TEXT_LIGHT,
-                bbox=dict(facecolor=DARK_BG, alpha=0.8, edgecolor=GRID_CLR, boxstyle='round'))
+        if len(wells) == 1:
+            well = wells[0]
+            vals = well.df[curve].dropna().values
+            if len(vals) == 0:
+                ax.text(0.5, 0.5, "No valid samples", transform=ax.transAxes,
+                        ha='center', va='center', color=TEXT_DIM)
+                self.canvas.draw()
+                return
+            color = TRACK_COLORS[0]
+
+            ax.hist(vals, bins=bins, color=color, alpha=0.75,
+                    edgecolor=DARK_BG, linewidth=0.5)
+            if len(vals) > 5:
+                from scipy.stats import gaussian_kde
+                kde = gaussian_kde(vals)
+                xs = np.linspace(vals.min(), vals.max(), 300)
+                ax2 = ax.twinx()
+                ax2.plot(xs, kde(xs), color=ACCENT2, linewidth=1.5, label='KDE')
+                ax2.set_ylabel("Density", color=ACCENT2, fontsize=fs(9))
+                ax2.tick_params(axis='y', colors=ACCENT2, labelsize=fs(7))
+                ax2.set_facecolor(PANEL_BG)
+
+            if log_scale:
+                ax.set_yscale('log')
+
+            ax.set_ylabel("Count", color=TEXT_LIGHT, fontsize=fs(10))
+            ax.set_title(f"Histogram  –  {curve}  |  {well.name}", color=ACCENT,
+                         fontsize=fs(11), fontweight='bold')
+
+            txt = (f"n = {len(vals):,}\n"
+                   f"μ = {np.mean(vals):.4g}\n"
+                   f"σ = {np.std(vals):.4g}\n"
+                   f"P10 = {np.percentile(vals,10):.4g}\n"
+                   f"P50 = {np.percentile(vals,50):.4g}\n"
+                   f"P90 = {np.percentile(vals,90):.4g}")
+            ax.text(0.98, 0.97, txt, transform=ax.transAxes, fontsize=fs(8),
+                    verticalalignment='top', horizontalalignment='right',
+                    color=TEXT_LIGHT,
+                    bbox=dict(facecolor=DARK_BG, alpha=0.8, edgecolor=GRID_CLR, boxstyle='round'))
+        else:
+            summary_lines = []
+            plotted = False
+            for idx, well in enumerate(wells):
+                vals = well.df[curve].dropna().values
+                if len(vals) == 0:
+                    continue
+                plotted = True
+                color = TRACK_COLORS[idx % len(TRACK_COLORS)]
+                ax.hist(vals, bins=bins, histtype='step', density=True, linewidth=1.5,
+                        color=color, alpha=0.95, label=well.name)
+                summary_lines.append(f"{well.name}: n={len(vals):,}, mean={np.mean(vals):.4g}")
+
+            if not plotted:
+                ax.text(0.5, 0.5, "No valid samples", transform=ax.transAxes,
+                        ha='center', va='center', color=TEXT_DIM)
+                self.canvas.draw()
+                return
+
+            if log_scale:
+                ax.set_yscale('log')
+
+            ax.set_ylabel("Density", color=TEXT_LIGHT, fontsize=fs(10))
+            ax.set_title(f"Histogram Compare  –  {curve}", color=ACCENT,
+                         fontsize=fs(11), fontweight='bold')
+            if summary_lines:
+                ax.legend(fontsize=fs(8), framealpha=0.85)
+            if summary_lines:
+                ax.text(0.98, 0.97, "\n".join(summary_lines[:6]), transform=ax.transAxes, fontsize=fs(8),
+                        verticalalignment='top', horizontalalignment='right',
+                        color=TEXT_LIGHT,
+                        bbox=dict(facecolor=DARK_BG, alpha=0.8, edgecolor=GRID_CLR, boxstyle='round'))
+
         self.canvas.draw()
 
 
@@ -934,66 +1264,234 @@ class CrossPlot(PlotCanvas):
     def __init__(self, parent=None):
         super().__init__(parent, figsize=(9, 8))
 
-    def plot(self, well: WellData, x_curve: str, y_curve: str,
+    def plot(self, wells, x_curve: str, y_curve: str,
              color_curve: str = None, size_curve: str = None):
         self.fig.clear()
-        df = well.df[[c for c in [x_curve, y_curve, color_curve, size_curve,
-                                   well.depth_col]
-                       if c and c in well.df.columns]].dropna(subset=[x_curve, y_curve])
-        if df.empty:
+        wells = ensure_well_list(wells)
+        valid_wells = [well for well in wells if x_curve in well.df.columns and y_curve in well.df.columns]
+        if not valid_wells:
             self.canvas.draw()
             return
 
         ax = self.fig.add_subplot(111)
-        x = df[x_curve].values
-        y = df[y_curve].values
         ax.tick_params(axis='both', labelsize=fs(8), colors=TEXT_DIM)
 
-        c_vals = df[color_curve].values if color_curve and color_curve in df else None
-        s_vals = None
-        if size_curve and size_curve in df:
-            sv = df[size_curve].values
-            sv = (sv - sv.min()) / (sv.max() - sv.min() + 1e-9) * 40 + 5
-            s_vals = sv
+        if len(valid_wells) == 1:
+            well = valid_wells[0]
+            df = well.df[[c for c in [x_curve, y_curve, color_curve, size_curve,
+                                       well.depth_col]
+                           if c and c in well.df.columns]].dropna(subset=[x_curve, y_curve])
+            if df.empty:
+                self.canvas.draw()
+                return
 
-        scatter = ax.scatter(x, y, c=c_vals if c_vals is not None else ACCENT,
-                             s=s_vals if s_vals is not None else 8,
-                             cmap='rainbow', alpha=0.6, linewidths=0,
-                             vmin=np.nanmin(c_vals) if c_vals is not None else None,
-                             vmax=np.nanmax(c_vals) if c_vals is not None else None)
+            x = df[x_curve].values
+            y = df[y_curve].values
+            c_vals = df[color_curve].values if color_curve and color_curve in df else None
+            s_vals = None
+            if size_curve and size_curve in df:
+                sv = df[size_curve].values
+                sv = (sv - sv.min()) / (sv.max() - sv.min() + 1e-9) * 40 + 5
+                s_vals = sv
 
-        if c_vals is not None:
-            cb = self.fig.colorbar(scatter, ax=ax, pad=0.01)
-            cb.set_label(color_curve, color=TEXT_LIGHT, fontsize=fs(8))
-            cb.ax.yaxis.set_tick_params(color=TEXT_DIM, labelsize=fs(7))
-            plt.setp(cb.ax.yaxis.get_ticklabels(), color=TEXT_DIM)
+            scatter = ax.scatter(x, y, c=c_vals if c_vals is not None else ACCENT,
+                                 s=s_vals if s_vals is not None else 8,
+                                 cmap='rainbow', alpha=0.6, linewidths=0,
+                                 vmin=np.nanmin(c_vals) if c_vals is not None else None,
+                                 vmax=np.nanmax(c_vals) if c_vals is not None else None)
 
-        # regression line
-        if len(x) > 2:
-            slope, intercept, r, p, _ = stats.linregress(x, y)
-            xs = np.linspace(x.min(), x.max(), 100)
-            ax.plot(xs, slope * xs + intercept, color=ACCENT2, linewidth=1.5,
-                    linestyle='--', label=f'R²={r**2:.3f}')
-            ax.legend(fontsize=fs(8))
+            if c_vals is not None:
+                cb = self.fig.colorbar(scatter, ax=ax, pad=0.01)
+                cb.set_label(color_curve, color=TEXT_LIGHT, fontsize=fs(8))
+                cb.ax.yaxis.set_tick_params(color=TEXT_DIM, labelsize=fs(7))
+                plt.setp(cb.ax.yaxis.get_ticklabels(), color=TEXT_DIM)
 
-        ux = well.curves.get(x_curve, {}).get('unit', '')
-        uy = well.curves.get(y_curve, {}).get('unit', '')
-        ax.set_xlabel(f"{x_curve}  [{ux}]" if ux else x_curve, color=TEXT_LIGHT, fontsize=fs(10))
-        ax.set_ylabel(f"{y_curve}  [{uy}]" if uy else y_curve, color=TEXT_LIGHT, fontsize=fs(10))
-        ax.set_title(f"Cross Plot  {x_curve} vs {y_curve}  |  {well.name}",
-                     color=ACCENT, fontsize=fs(11), fontweight='bold')
+            if len(x) > 2:
+                slope, intercept, r, p, _ = stats.linregress(x, y)
+                xs = np.linspace(x.min(), x.max(), 100)
+                ax.plot(xs, slope * xs + intercept, color=ACCENT2, linewidth=1.5,
+                        linestyle='--', label=f'R²={r**2:.3f}')
+                ax.legend(fontsize=fs(8))
+
+            ux = well.curves.get(x_curve, {}).get('unit', '')
+            uy = well.curves.get(y_curve, {}).get('unit', '')
+            ax.set_xlabel(f"{x_curve}  [{ux}]" if ux else x_curve, color=TEXT_LIGHT, fontsize=fs(10))
+            ax.set_ylabel(f"{y_curve}  [{uy}]" if uy else y_curve, color=TEXT_LIGHT, fontsize=fs(10))
+            ax.set_title(f"Cross Plot  {x_curve} vs {y_curve}  |  {well.name}",
+                         color=ACCENT, fontsize=fs(11), fontweight='bold')
+        else:
+            plotted = False
+            for idx, well in enumerate(valid_wells):
+                columns = [column for column in [x_curve, y_curve, size_curve] if column and column in well.df.columns]
+                df = well.df[columns].dropna(subset=[x_curve, y_curve])
+                if df.empty:
+                    continue
+                plotted = True
+
+                s_vals = None
+                if size_curve and size_curve in df:
+                    sv = df[size_curve].values
+                    s_vals = (sv - sv.min()) / (sv.max() - sv.min() + 1e-9) * 40 + 8
+
+                color = TRACK_COLORS[idx % len(TRACK_COLORS)]
+                ax.scatter(
+                    df[x_curve].values,
+                    df[y_curve].values,
+                    c=color,
+                    s=s_vals if s_vals is not None else 10,
+                    alpha=0.45,
+                    linewidths=0,
+                    label=well.name,
+                )
+
+                if len(df) > 2 and len(valid_wells) <= 5:
+                    slope, intercept, r, p, _ = stats.linregress(df[x_curve].values, df[y_curve].values)
+                    xs = np.linspace(df[x_curve].min(), df[x_curve].max(), 100)
+                    ax.plot(xs, slope * xs + intercept, color=color, linewidth=1.2, linestyle='--')
+
+            if not plotted:
+                ax.text(0.5, 0.5, "No valid samples", transform=ax.transAxes,
+                        ha='center', va='center', color=TEXT_DIM)
+                self.canvas.draw()
+                return
+
+            ux = valid_wells[0].curves.get(x_curve, {}).get('unit', '')
+            uy = valid_wells[0].curves.get(y_curve, {}).get('unit', '')
+            ax.set_xlabel(f"{x_curve}  [{ux}]" if ux else x_curve, color=TEXT_LIGHT, fontsize=fs(10))
+            ax.set_ylabel(f"{y_curve}  [{uy}]" if uy else y_curve, color=TEXT_LIGHT, fontsize=fs(10))
+            ax.set_title(f"Cross Plot Compare  {x_curve} vs {y_curve}",
+                         color=ACCENT, fontsize=fs(11), fontweight='bold')
+            ax.legend(fontsize=fs(8), framealpha=0.85)
+
         self.canvas.draw()
 
 
 # ─────────────────────────────────────────────
 #  CONTROL PANELS (right dock)
 # ─────────────────────────────────────────────
+class WellSelectionControls(QWidget):
+    selection_changed = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self.active_well_name = ""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+
+        group = QGroupBox("Well Scope")
+        group_layout = QVBoxLayout(group)
+
+        self.compare_cb = QCheckBox("Compare selected wells")
+        group_layout.addWidget(self.compare_cb)
+
+        self.well_list = QListWidget()
+        self.well_list.setSelectionMode(QAbstractItemView.MultiSelection)
+        self.well_list.setMaximumHeight(180)
+        group_layout.addWidget(self.well_list)
+
+        action_row = QHBoxLayout()
+        self.active_btn = QPushButton("Active Only")
+        self.all_btn = QPushButton("Select All")
+        action_row.addWidget(self.active_btn)
+        action_row.addWidget(self.all_btn)
+        group_layout.addLayout(action_row)
+
+        layout.addWidget(group)
+
+        self.compare_cb.toggled.connect(self._on_compare_toggled)
+        self.well_list.itemSelectionChanged.connect(self.selection_changed.emit)
+        self.active_btn.clicked.connect(self.use_active_only)
+        self.all_btn.clicked.connect(self.select_all)
+        self._apply_mode_state()
+
+    def compare_enabled(self):
+        return self.compare_cb.isChecked()
+
+    def set_wells(self, wells, active_name=None, emit=False):
+        wells = ensure_well_list(wells)
+        if active_name is not None:
+            self.active_well_name = active_name
+        previous_selection = set(self.selected_well_names())
+
+        self.well_list.blockSignals(True)
+        self.well_list.clear()
+        for well in wells:
+            self.well_list.addItem(QListWidgetItem(well.name))
+        self.well_list.blockSignals(False)
+
+        if self.compare_enabled():
+            names_to_select = previous_selection or {well.name for well in wells}
+        else:
+            names_to_select = {self.active_well_name} if self.active_well_name else set()
+        self._select_names(names_to_select, emit=False)
+        self._apply_mode_state()
+
+        if emit:
+            self.selection_changed.emit()
+
+    def set_active_well(self, well_name, emit=False):
+        self.active_well_name = well_name or ""
+        if not self.compare_enabled():
+            self._select_names([self.active_well_name], emit=False)
+        if emit:
+            self.selection_changed.emit()
+
+    def selected_well_names(self):
+        if not self.compare_enabled():
+            return [self.active_well_name] if self.active_well_name else []
+        return [item.text() for item in self.well_list.selectedItems()]
+
+    def select_all(self, emit=True):
+        self.compare_cb.blockSignals(True)
+        self.compare_cb.setChecked(True)
+        self.compare_cb.blockSignals(False)
+        names = [self.well_list.item(index).text() for index in range(self.well_list.count())]
+        self._select_names(names, emit=False)
+        self._apply_mode_state()
+        if emit:
+            self.selection_changed.emit()
+
+    def use_active_only(self, emit=True):
+        self.compare_cb.blockSignals(True)
+        self.compare_cb.setChecked(False)
+        self.compare_cb.blockSignals(False)
+        self._select_names([self.active_well_name], emit=False)
+        self._apply_mode_state()
+        if emit:
+            self.selection_changed.emit()
+
+    def _select_names(self, names, emit=False):
+        selected = set(name for name in names if name)
+        self.well_list.blockSignals(True)
+        for index in range(self.well_list.count()):
+            item = self.well_list.item(index)
+            item.setSelected(item.text() in selected)
+        self.well_list.blockSignals(False)
+        if emit:
+            self.selection_changed.emit()
+
+    def _on_compare_toggled(self, enabled):
+        if enabled and self.well_list.count() > 1 and len(self.selected_well_names()) <= 1:
+            names = [self.well_list.item(index).text() for index in range(self.well_list.count())]
+            self._select_names(names, emit=False)
+        elif not enabled:
+            self._select_names([self.active_well_name], emit=False)
+
+        self._apply_mode_state()
+        self.selection_changed.emit()
+
+    def _apply_mode_state(self):
+        compare_enabled = self.compare_enabled()
+        self.well_list.setEnabled(compare_enabled)
+        self.all_btn.setEnabled(compare_enabled)
+
+
 class MultiTrackControls(QWidget):
     plot_requested = pyqtSignal(list, tuple)   # curves, depth_range
 
     def __init__(self, well=None):
         super().__init__()
-        self.well = well
+        self.wells = ensure_well_list(well)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
 
@@ -1019,23 +1517,25 @@ class MultiTrackControls(QWidget):
         layout.addWidget(btn)
         layout.addStretch()
 
-    def set_well(self, well):
-        self.well = well
+    def set_wells(self, wells):
+        self.wells = ensure_well_list(wells)
         self.curve_list.clear()
-        if well:
-            for c in well.curve_names:
-                if c != well.depth_col:
-                    self.curve_list.addItem(c)
-            if well.depth_col and well.depth_col in well.df:
-                d = well.df[well.depth_col].dropna()
-                self.depth_min.setValue(float(d.min()))
-                self.depth_max.setValue(float(d.max()))
+        for curve in available_curve_names(self.wells, mode='union'):
+            self.curve_list.addItem(curve)
+
+        depth_min, depth_max = depth_limits_for_wells(self.wells)
+        self.depth_min.setValue(depth_min)
+        self.depth_max.setValue(depth_max)
+
+    def set_well(self, well):
+        self.set_wells([well] if well else [])
 
     def _emit(self):
         selected = [item.text() for item in self.curve_list.selectedItems()]
-        if not selected and self.well:
-            selected = [c for c in self.well.curve_names
-                        if c != self.well.depth_col][:8]
+        if not selected:
+            selected = available_curve_names(self.wells, mode='intersection')[:8]
+        if not selected:
+            selected = available_curve_names(self.wells, mode='union')[:8]
         self.plot_requested.emit(selected, (self.depth_min.value(), self.depth_max.value()))
 
 
@@ -1044,6 +1544,7 @@ class HistogramControls(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.wells = []
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
 
@@ -1062,17 +1563,21 @@ class HistogramControls(QWidget):
         layout.addWidget(btn)
         layout.addStretch()
 
-    def set_well(self, well):
+    def set_wells(self, wells):
+        self.wells = ensure_well_list(wells)
         self.curve_cb.clear()
-        if well:
-            for c in well.curve_names:
-                if c != well.depth_col:
-                    self.curve_cb.addItem(c)
+        for curve in available_curve_names(self.wells, mode='union'):
+            self.curve_cb.addItem(curve)
+
+    def set_well(self, well):
+        self.set_wells([well] if well else [])
 
     def _emit(self):
-        self.plot_requested.emit(self.curve_cb.currentText(),
-                                  self.bins_sb.value(),
-                                  self.log_cb.isChecked())
+        self.plot_requested.emit(
+            self.curve_cb.currentText(),
+            self.bins_sb.value(),
+            self.log_cb.isChecked(),
+        )
 
 
 class CrossPlotControls(QWidget):
@@ -1080,6 +1585,7 @@ class CrossPlotControls(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.wells = []
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
 
@@ -1102,20 +1608,24 @@ class CrossPlotControls(QWidget):
         layout.addWidget(btn)
         layout.addStretch()
 
-    def set_well(self, well):
+    def set_wells(self, wells):
+        self.wells = ensure_well_list(wells)
         for cb in (self.x_cb, self.y_cb, self.col_cb, self.sz_cb):
             cb.clear()
         self.col_cb.addItem("None")
         self.sz_cb.addItem("None")
-        if well:
-            curves = [c for c in well.curve_names if c != well.depth_col]
-            for c in curves:
-                self.x_cb.addItem(c)
-                self.y_cb.addItem(c)
-                self.col_cb.addItem(c)
-                self.sz_cb.addItem(c)
-            if len(curves) >= 2:
-                self.y_cb.setCurrentIndex(1)
+
+        curves = available_curve_names(self.wells, mode='union')
+        for curve in curves:
+            self.x_cb.addItem(curve)
+            self.y_cb.addItem(curve)
+            self.col_cb.addItem(curve)
+            self.sz_cb.addItem(curve)
+        if len(curves) >= 2:
+            self.y_cb.setCurrentIndex(1)
+
+    def set_well(self, well):
+        self.set_wells([well] if well else [])
 
     def _emit(self):
         col = self.col_cb.currentText()
@@ -1151,12 +1661,13 @@ class WellLogViewer(QMainWindow):
         # Status bar
         self.status = QStatusBar()
         self.setStatusBar(self.status)
-        self.status.showMessage("Ready  –  Load a LAS or CSV file to begin")
+        self.status.showMessage("Ready  –  Load one or more LAS/CSV files to begin")
 
         # Left dock – Well Explorer
         self.explorer = WellExplorer(self)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.explorer)
         self.explorer.well_selected.connect(self._on_well_selected)
+        self.explorer.well_removed.connect(self._on_well_removed)
 
         # Right dock – Controls
         self.ctrl_dock = QDockWidget("Plot Controls", self)
@@ -1166,6 +1677,8 @@ class WellLogViewer(QMainWindow):
         self.ctrl_layout.setContentsMargins(0, 0, 0, 0)
         self.ctrl_dock.setWidget(self.ctrl_widget)
         self.addDockWidget(Qt.RightDockWidgetArea, self.ctrl_dock)
+        self.scope_ctrl = WellSelectionControls()
+        self.ctrl_layout.addWidget(self.scope_ctrl)
 
         # Central tab widget
         self.tabs = QTabWidget()
@@ -1213,6 +1726,7 @@ class WellLogViewer(QMainWindow):
         self._tab_changed(0)
 
         # wire controls
+        self.scope_ctrl.selection_changed.connect(self._on_well_scope_changed)
         self.track_ctrl.plot_requested.connect(self._plot_multitrack)
         self.hist_ctrl.plot_requested.connect(self._plot_histogram)
         self.xplot_ctrl.plot_requested.connect(self._plot_crossplot)
@@ -1223,6 +1737,7 @@ class WellLogViewer(QMainWindow):
         fm = mb.addMenu("&File")
         fm.addAction("Load LAS File…",   lambda: self.load_file('las'), "Ctrl+O")
         fm.addAction("Load CSV File…",   lambda: self.load_file('csv'), "Ctrl+Shift+O")
+        fm.addAction("Load Multiple Wells…", lambda: self.load_file('mixed', multiple=True), "Ctrl+Shift+M")
         fm.addSeparator()
         fm.addAction("Export Plot…",     self._export_plot, "Ctrl+S")
         fm.addSeparator()
@@ -1266,6 +1781,7 @@ class WellLogViewer(QMainWindow):
 
         _btn("📂 LAS",  "Load LAS file",  lambda: self.load_file('las'))
         _btn("📂 CSV",  "Load CSV file",  lambda: self.load_file('csv'))
+        _btn("📚 Multi", "Load multiple well files", lambda: self.load_file('mixed', multiple=True))
         tb.addSeparator()
         _btn("📈 Multi-Track",   "Multi-track plot",   lambda: self.tabs.setCurrentIndex(3))
         _btn("🔗 Triple Combo",  "Triple combo plot",  lambda: self.tabs.setCurrentIndex(4))
@@ -1280,93 +1796,221 @@ class WellLogViewer(QMainWindow):
         _btn("⛶ Full", "Toggle full screen", self._toggle_fullscreen)
 
     # ── slots ──────────────────────────────────
-    def load_file(self, fmt='las'):
+    def _pick_well_paths(self, fmt='las', multiple=False):
         if fmt == 'las':
-            path, _ = QFileDialog.getOpenFileName(
-                self, "Open LAS File", "", "LAS Files (*.las *.LAS);;All Files (*)")
-            if not path: return
-            try:
-                well = load_las(path)
-            except ImportError:
-                QMessageBox.warning(self, "Missing library",
-                    "lasio is not installed.\n\nRun:  pip install lasio")
-                return
-            except Exception as e:
-                QMessageBox.critical(self, "Error loading LAS", str(e))
-                return
+            title = "Open LAS Files" if multiple else "Open LAS File"
+            file_filter = "LAS Files (*.las *.LAS);;All Files (*)"
+        elif fmt == 'csv':
+            title = "Open CSV Files" if multiple else "Open CSV File"
+            file_filter = "CSV Files (*.csv *.CSV *.txt *.TXT);;All Files (*)"
         else:
-            path, _ = QFileDialog.getOpenFileName(
-                self, "Open CSV File", "", "CSV Files (*.csv *.txt);;All Files (*)")
-            if not path: return
-            try:
-                well = load_csv(path)
-            except Exception as e:
-                QMessageBox.critical(self, "Error loading CSV", str(e))
-                return
+            title = "Open Well Files"
+            file_filter = (
+                "Well Files (*.las *.LAS *.csv *.CSV *.txt *.TXT);;"
+                "LAS Files (*.las *.LAS);;"
+                "CSV Files (*.csv *.CSV *.txt *.TXT);;"
+                "All Files (*)"
+            )
 
-        self.explorer.add_well(well)
-        self._on_well_selected(well)
-        self.status.showMessage(f"Loaded: {well.name}  ({len(well.curve_names)} curves, "
-                                f"{len(well.df)} samples)")
+        if multiple:
+            paths, _ = QFileDialog.getOpenFileNames(self, title, "", file_filter)
+            return paths
+
+        path, _ = QFileDialog.getOpenFileName(self, title, "", file_filter)
+        return [path] if path else []
+
+    def _load_well_path(self, path, fmt=None):
+        detected_fmt = fmt if fmt in ('las', 'csv') else detect_well_format(path)
+        if detected_fmt == 'las':
+            return load_las(path)
+        if detected_fmt == 'csv':
+            return load_csv(path)
+        raise ValueError(f"Unsupported well file format: {os.path.basename(path)}")
+
+    def _show_load_issues(self, loaded_wells, errors):
+        if not errors:
+            return
+
+        preview = "\n".join(f"- {error}" for error in errors[:8])
+        if len(errors) > 8:
+            preview += f"\n- ... and {len(errors) - 8} more"
+
+        QMessageBox.warning(
+            self,
+            "Well import completed with issues",
+            (
+                f"Loaded {len(loaded_wells)} well(s).\n"
+                f"Failed {len(errors)} file(s).\n\n"
+                f"{preview}"
+            ),
+        )
+
+    def load_file(self, fmt='las', multiple=False):
+        paths = self._pick_well_paths(fmt, multiple)
+        if not paths:
+            return []
+
+        requested_fmt = fmt if fmt in ('las', 'csv') else None
+        loaded_wells = []
+        errors = []
+
+        for path in paths:
+            try:
+                well = self._load_well_path(path, requested_fmt)
+            except ImportError:
+                errors.append(f"{os.path.basename(path)}: lasio is not installed. Run `pip install lasio`.")
+            except Exception as exc:
+                errors.append(f"{os.path.basename(path)}: {exc}")
+            else:
+                loaded_wells.append(self.explorer.add_well(well))
+
+        if not loaded_wells:
+            title = "Error loading wells" if multiple or fmt == 'mixed' else (
+                "Error loading LAS" if fmt == 'las' else "Error loading CSV"
+            )
+            QMessageBox.critical(self, title, "\n".join(errors) if errors else "No well files were loaded.")
+            return []
+
+        active_well = loaded_wells[-1]
+        self._sync_scope_controls()
+        self._on_well_selected(active_well)
+
+        if len(loaded_wells) == 1:
+            well = loaded_wells[0]
+            self.status.showMessage(
+                f"Loaded: {well.name}  ({len(well.curve_names)} curves, {len(well.df)} samples)"
+            )
+        else:
+            self.status.showMessage(
+                f"Loaded {len(loaded_wells)} wells. Active well: {active_well.name}"
+            )
+
+        self._show_load_issues(loaded_wells, errors)
+        return loaded_wells
+
+    def _all_loaded_wells(self):
+        return list(self.explorer.wells.values())
+
+    def _selected_wells(self):
+        if not self.explorer.wells:
+            return []
+
+        selected_names = self.scope_ctrl.selected_well_names()
+        wells = [self.explorer.wells[name] for name in selected_names if name in self.explorer.wells]
+        if wells:
+            return wells
+        if self.current_well and self.current_well.name in self.explorer.wells:
+            return [self.current_well]
+        return [next(iter(self.explorer.wells.values()))]
+
+    def _sync_scope_controls(self, emit=False):
+        self.scope_ctrl.set_wells(
+            self._all_loaded_wells(),
+            self.current_well.name if self.current_well else "",
+            emit=emit,
+        )
+
+    def _refresh_context_views(self):
+        wells = self._selected_wells()
+        if not wells:
+            self._clear_active_well()
+            return
+
+        if len(wells) == 1:
+            well = wells[0]
+            self.header_tab.load(well)
+            self.stats_tab.load(well)
+            self.data_tab.load(well)
+        else:
+            self.header_tab.load_comparison(wells)
+            self.stats_tab.load_comparison(wells)
+            self.data_tab.load_comparison(wells)
+
+        self.track_ctrl.set_wells(wells)
+        self.hist_ctrl.set_wells(wells)
+        self.xplot_ctrl.set_wells(wells)
+
+        idx = self.tabs.currentIndex()
+        if idx == 3:
+            self._plot_multitrack([], (self.track_ctrl.depth_min.value(), self.track_ctrl.depth_max.value()))
+        elif idx == 4:
+            self.triple_canvas.plot(wells)
+
+        if len(wells) == 1:
+            self.status.showMessage(f"Active well: {wells[0].name}")
+        else:
+            self.status.showMessage(f"Comparing {len(wells)} wells: {summarize_well_names(wells)}")
 
     def _on_well_selected(self, well: WellData):
         self.current_well = well
-        self.header_tab.load(well)
-        self.stats_tab.load(well)
-        self.data_tab.load(well)
-        self.track_ctrl.set_well(well)
-        self.hist_ctrl.set_well(well)
-        self.xplot_ctrl.set_well(well)
+        self.explorer.select_well(well.name)
+        self.scope_ctrl.set_active_well(well.name)
+        self._refresh_context_views()
 
-        # auto-plot current tab
-        idx = self.tabs.currentIndex()
-        if idx == 3:
-            self._plot_multitrack([], (None, None))
-        elif idx == 4:
-            self.triple_canvas.plot(well)
-        self.status.showMessage(f"Active well: {well.name}")
+    def _on_well_scope_changed(self):
+        wells = self._selected_wells()
+        if wells:
+            selected_names = {well.name for well in wells}
+            if self.current_well is None or self.current_well.name not in selected_names:
+                self.current_well = wells[0]
+                self.explorer.select_well(self.current_well.name)
+                self.scope_ctrl.set_active_well(self.current_well.name)
+        self._refresh_context_views()
+
+    def _on_well_removed(self, well_name):
+        if self.current_well is not None and self.current_well.name == well_name:
+            remaining_wells = self._all_loaded_wells()
+            self.current_well = remaining_wells[-1] if remaining_wells else None
+
+        self._sync_scope_controls()
+        if self.current_well:
+            self.explorer.select_well(self.current_well.name)
+            self.scope_ctrl.set_active_well(self.current_well.name)
+            self._refresh_context_views()
+            self.status.showMessage(f"Removed: {well_name}. Active context updated.")
+        else:
+            self._clear_active_well()
+            self.status.showMessage(f"Removed: {well_name}. No wells loaded.")
 
     def _tab_changed(self, idx):
         for w in (self.track_ctrl, self.hist_ctrl, self.xplot_ctrl):
             w.hide()
         if idx == 3:
             self.track_ctrl.show()
+            if self._selected_wells():
+                self._plot_multitrack([], (self.track_ctrl.depth_min.value(), self.track_ctrl.depth_max.value()))
         elif idx == 4:
-            # triple combo – auto plot
-            if self.current_well:
-                self.triple_canvas.plot(self.current_well)
+            if self._selected_wells():
+                self.triple_canvas.plot(self._selected_wells())
         elif idx == 5:
             self.hist_ctrl.show()
         elif idx == 6:
             self.xplot_ctrl.show()
 
     def _plot_multitrack(self, curves, depth_range):
-        if not self.current_well:
+        wells = self._selected_wells()
+        if not wells:
             return
         dr = depth_range if depth_range and depth_range[0] < depth_range[1] else None
-        self.track_canvas.plot(self.current_well, curves or None, dr)
-
-    def _plot_histogram(self, curve, bins, log_scale):
-        if not self.current_well or not curve:
-            return
-        self.hist_canvas.plot(self.current_well, curve, bins, log_scale)
+        self.track_canvas.plot(wells, curves or None, dr)
     
     def _plot_histogram(self, curve, bins, log_scale):
-
-        if not self.current_well or not curve:
+        wells = self._selected_wells()
+        if not wells or not curve:
             return
     
         self.hist_canvas.plot(
-            self.current_well,
+            wells,
             curve,
             bins=bins,
             log_scale=log_scale,
         )
 
     def _plot_crossplot(self, x, y, col, sz):
-        if not self.current_well or not x or not y:
+        wells = self._selected_wells()
+        if not wells or not x or not y:
             return
-        self.xplot_canvas.plot(self.current_well, x, y,
+        self.xplot_canvas.plot(wells, x, y,
                                 col or None, sz or None)
 
     def _ensure_active_well(self, action_name):
@@ -1379,7 +2023,24 @@ class WellLogViewer(QMainWindow):
         if not self.current_well:
             return
         self.explorer.rebuild_tree()
-        self._on_well_selected(self.current_well)
+        self._sync_scope_controls()
+        self.explorer.select_well(self.current_well.name)
+        self.scope_ctrl.set_active_well(self.current_well.name)
+        self._refresh_context_views()
+
+    def _clear_active_well(self):
+        self.current_well = None
+        self.scope_ctrl.set_wells([], active_name="", emit=False)
+        self.header_tab.clear_view()
+        self.stats_tab.clear_view()
+        self.data_tab.clear_view()
+        self.track_ctrl.set_wells([])
+        self.hist_ctrl.set_wells([])
+        self.xplot_ctrl.set_wells([])
+        self.track_canvas.clear()
+        self.triple_canvas.clear()
+        self.hist_canvas.clear()
+        self.xplot_canvas.clear()
 
     def _format_facies_mapping(self, label_mapping):
         if not label_mapping:
@@ -1389,13 +2050,45 @@ class WellLogViewer(QMainWindow):
             entries = entries[:8] + ["..."]
         return "\nCode mapping: " + ", ".join(entries)
 
+    def _selected_processing_wells(self):
+        wells = self._selected_wells()
+        if wells:
+            return wells
+        return [self.current_well] if self.current_well else []
+
+    def _apply_facies_curve(self, well, output_column, description, prediction_codes):
+        well.df[output_column] = prediction_codes
+        well.curves[output_column] = {
+            'unit': 'class',
+            'desc': description,
+        }
+
+    def _show_batch_result_summary(self, title, successes, errors):
+        lines = successes[:8]
+        if len(successes) > 8:
+            lines.append(f"... and {len(successes) - 8} more successful well(s)")
+        if errors:
+            lines.append("")
+            lines.append("Errors:")
+            lines.extend(errors[:8])
+            if len(errors) > 8:
+                lines.append(f"... and {len(errors) - 8} more error(s)")
+
+        QMessageBox.information(self, title, "\n".join(lines))
+
     def _run_facies(self):
         if not self._ensure_active_well("Facies Classification"):
             return
 
         chooser = QMessageBox(self)
         chooser.setWindowTitle("Facies Classification")
-        chooser.setText("Choose the facies-classification workflow to run.")
+        target_wells = self._selected_processing_wells()
+        scope_text = (
+            f"Run the workflow on {len(target_wells)} selected wells."
+            if len(target_wells) > 1 else
+            "Run the workflow on the active well."
+        )
+        chooser.setText(f"Choose the facies-classification workflow to run.\n\n{scope_text}")
         supervised_btn = chooser.addButton("Supervised", QMessageBox.AcceptRole)
         unsupervised_btn = chooser.addButton("Unsupervised", QMessageBox.AcceptRole)
         chooser.addButton(QMessageBox.Cancel)
@@ -1411,75 +2104,109 @@ class WellLogViewer(QMainWindow):
         if not self._ensure_active_well("Supervised Classification"):
             return
 
-        from gui.facies_supervised import SupervisedFaciesDialog
+        from gui.facies_supervised import SupervisedFaciesDialog, SupervisedFaciesClassifier
+
+        target_wells = self._selected_processing_wells()
 
         dialog = SupervisedFaciesDialog(self.current_well, self)
         if dialog.exec_() != QDialog.Accepted:
             return
 
+        config = dialog.get_config()
         result = dialog.get_result()
         if result is None:
             return
 
-        self.current_well.df[result.output_column] = result.prediction_codes
-        self.current_well.curves[result.output_column] = {
-            'unit': 'class',
-            'desc': f"Supervised facies codes generated with {result.model_name}",
-        }
+        successes = []
+        errors = []
+        for well in target_wells:
+            try:
+                well_result = result if well is self.current_well else SupervisedFaciesClassifier(config).run(well.df)
+                self._apply_facies_curve(
+                    well,
+                    well_result.output_column,
+                    f"Supervised facies codes generated with {well_result.model_name}",
+                    well_result.prediction_codes,
+                )
+                successes.append(
+                    f"{well.name}: rows={well_result.used_rows}, train={well_result.train_accuracy:.3f}, "
+                    f"validation={well_result.validation_accuracy:.3f}"
+                )
+            except Exception as exc:
+                errors.append(f"{well.name}: {exc}")
+
+        if not successes:
+            QMessageBox.critical(self, "Supervised Classification", "\n".join(errors) if errors else "No wells were classified.")
+            return
+
         self._refresh_current_well_views()
         self.status.showMessage(
-            f"Created facies curve: {result.output_column} ({result.model_name})"
+            f"Created facies curve {result.output_column} on {len(successes)} well(s)"
         )
-
-        QMessageBox.information(
-            self,
+        self._show_batch_result_summary(
             "Supervised Classification Complete",
-            (
-                f"Output column: {result.output_column}\n"
-                f"Method: {result.model_name}\n"
-                f"Rows classified: {result.used_rows}\n"
-                f"Training rows: {result.train_rows}\n"
-                f"Validation rows: {result.validation_rows}\n"
-                f"Train accuracy: {result.train_accuracy:.3f}\n"
-                f"Validation accuracy: {result.validation_accuracy:.3f}"
-                f"{self._format_facies_mapping(result.label_mapping)}"
-            ),
+            [
+                f"Output column: {result.output_column}",
+                f"Method: {result.model_name}",
+                f"Classified wells: {len(successes)}",
+                *successes,
+                self._format_facies_mapping(result.label_mapping).strip(),
+            ],
+            errors,
         )
 
     def _unsupervised_facies(self):
         if not self._ensure_active_well("Unsupervised Classification"):
             return
 
-        from gui.facies_unsupervised import UnsupervisedFaciesDialog
+        from gui.facies_unsupervised import UnsupervisedFaciesDialog, UnsupervisedFaciesClassifier
+
+        target_wells = self._selected_processing_wells()
 
         dialog = UnsupervisedFaciesDialog(self.current_well, self)
         if dialog.exec_() != QDialog.Accepted:
             return
 
+        config = dialog.get_config()
         result = dialog.get_result()
         if result is None:
             return
 
-        self.current_well.df[result.output_column] = result.prediction_codes
-        self.current_well.curves[result.output_column] = {
-            'unit': 'class',
-            'desc': f"Unsupervised facies codes generated with {result.model_name}",
-        }
+        successes = []
+        errors = []
+        for well in target_wells:
+            try:
+                well_result = result if well is self.current_well else UnsupervisedFaciesClassifier(config).run(well.df)
+                self._apply_facies_curve(
+                    well,
+                    well_result.output_column,
+                    f"Unsupervised facies codes generated with {well_result.model_name}",
+                    well_result.prediction_codes,
+                )
+                successes.append(
+                    f"{well.name}: rows={well_result.used_rows}, clusters={well_result.cluster_count}, "
+                    f"noise={well_result.noise_points}"
+                )
+            except Exception as exc:
+                errors.append(f"{well.name}: {exc}")
+
+        if not successes:
+            QMessageBox.critical(self, "Unsupervised Classification", "\n".join(errors) if errors else "No wells were classified.")
+            return
+
         self._refresh_current_well_views()
         self.status.showMessage(
-            f"Created facies curve: {result.output_column} ({result.model_name})"
+            f"Created facies curve {result.output_column} on {len(successes)} well(s)"
         )
-
-        QMessageBox.information(
-            self,
+        self._show_batch_result_summary(
             "Unsupervised Classification Complete",
-            (
-                f"Output column: {result.output_column}\n"
-                f"Method: {result.model_name}\n"
-                f"Rows classified: {result.used_rows}\n"
-                f"Clusters found: {result.cluster_count}\n"
-                f"Noise samples: {result.noise_points}"
-            ),
+            [
+                f"Output column: {result.output_column}",
+                f"Method: {result.model_name}",
+                f"Classified wells: {len(successes)}",
+                *successes,
+            ],
+            errors,
         )
 
     def _minimize_window(self):
@@ -1517,13 +2244,12 @@ class WellLogViewer(QMainWindow):
             "<h2>Well Log Viewer</h2>"
             "<p>Professional Petrophysics Analysis Tool</p>"
             "<p><b>Features:</b><br>"
-            "• Load LAS and CSV well log files<br>"
+            "• Load LAS and CSV well log files, including batch import<br>"
+            "• Choose one, many, or all wells for comparison<br>"
             "• Header / curve metadata viewer<br>"
             "• Statistical summary table<br>"
-            "• Multi-track depth plot<br>"
-            "• Triple combo plot (GR | RES | POR)<br>"
-            "• Histogram with KDE<br>"
-            "• Cross plot with regression<br>"
+            "• Multi-track and triple-combo comparison views<br>"
+            "• Histogram and cross-plot comparison views<br>"
             "• Export plots as PNG / PDF / SVG</p>"
             "<p>Built with PyQt5 + Matplotlib + lasio</p>")
 
@@ -1541,14 +2267,14 @@ class WellDataWindow(WellLogViewer):
         self.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
         self.setWindowFlag(Qt.WindowCloseButtonHint, True)
 
-    def open_las_dialog(self):
-        before = self.current_well.filename if self.current_well else ""
-        self.load_file('las')
-        after = self.current_well.filename if self.current_well else ""
-        if after and after != before:
-            self.well_loaded.emit(after)
-            return True
-        return False
+    def load_file(self, fmt='las', multiple=False):
+        loaded_wells = super().load_file(fmt, multiple)
+        for well in loaded_wells:
+            self.well_loaded.emit(well.filename)
+        return loaded_wells
+
+    def open_las_dialog(self, multiple=False):
+        return bool(self.load_file('las', multiple=multiple))
 
 
 # ─────────────────────────────────────────────

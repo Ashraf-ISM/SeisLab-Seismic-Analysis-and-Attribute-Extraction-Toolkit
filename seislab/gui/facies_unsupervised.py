@@ -157,6 +157,7 @@ class UnsupervisedFaciesDialog(QDialog):
         super().__init__(parent)
         self.well = well
         self.result_data = None
+        self.config_data = None
 
         self.setWindowTitle("Unsupervised Facies Classification")
         self.resize(540, 680)
@@ -345,6 +346,7 @@ class UnsupervisedFaciesDialog(QDialog):
     def _run_classification(self):
         try:
             config = self._build_config()
+            self.config_data = config
             self.result_data = UnsupervisedFaciesClassifier(config).run(self.well.df)
         except Exception as exc:
             QMessageBox.critical(self, "Unsupervised Classification", str(exc))
@@ -354,3 +356,6 @@ class UnsupervisedFaciesDialog(QDialog):
 
     def get_result(self):
         return self.result_data
+
+    def get_config(self):
+        return self.config_data or self._build_config()
