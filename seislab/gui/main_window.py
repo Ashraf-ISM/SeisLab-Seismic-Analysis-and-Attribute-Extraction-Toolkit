@@ -31,6 +31,7 @@ from gui.interpretation_panel import InterpretationPanel
 from gui.info_panel import InfoPanel
 from gui.well_data_panel import WellDataWindow
 from seismic.segy_loader import SegyLoader
+from seismic.seismic_info import build_loader_info
 
 
 # ─────────────────────────────────────────────
@@ -1448,7 +1449,7 @@ class SeisLabApp(QMainWindow):
     def update_file_info(self):
         if not self.segy_loader:
             return
-        info = self.segy_loader.get_info()
+        info = build_loader_info(self.segy_loader)
         self.info_panel.update_info(info)
 
         ni  = max(1, info.get("n_inlines", 1))
@@ -1504,7 +1505,7 @@ class SeisLabApp(QMainWindow):
 
             vm = self.view_mode.currentText()
             if vm == "Inline View":
-                self.current_data = self.segy_loader.get_inline(self.current_inline)
+                self.current_data = self.segy_loader.data[self.current_inline, :, :]
                 section_kind = "Inline"
                 section_index = self.current_inline
                 horizontal_label = "Crossline Number"
@@ -1523,7 +1524,7 @@ class SeisLabApp(QMainWindow):
                     show_axis=self.chk_show_axis.isChecked(),
                 )
             elif vm == "Crossline View":
-                self.current_data = self.segy_loader.get_crossline(self.current_crossline)
+                self.current_data = self.segy_loader.data[:, self.current_crossline, :]
                 section_kind = "Crossline"
                 section_index = self.current_crossline
                 horizontal_label = "Inline Number"
@@ -1542,7 +1543,7 @@ class SeisLabApp(QMainWindow):
                     show_axis=self.chk_show_axis.isChecked(),
                 )
             else:
-                self.current_data = self.segy_loader.get_timeslice(self.current_timeslice)
+                self.current_data = self.segy_loader.data[:, :, self.current_timeslice]
                 section_kind = "Time Slice"
                 section_index = self.current_timeslice
                 horizontal_label = "Inline Number"

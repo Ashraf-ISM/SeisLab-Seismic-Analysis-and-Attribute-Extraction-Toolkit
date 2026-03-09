@@ -384,8 +384,10 @@ def on_canvas_click(event):
 ### Trace Header Export
 
 ```python
+from seismic import export_trace_headers
+
 # Export all trace headers to CSV for external QC
-loader.export_trace_headers('headers.csv')
+export_trace_headers(loader, 'headers.csv')
 
 # The resulting DataFrame allows:
 #   — Geometry validation in Excel or Python
@@ -433,21 +435,23 @@ viewer.export_figure('section.png', dpi=300)
 **Load a SEG-Y file and inspect all headers**
 
 ```python
-from seismic.segy_loader import SegyLoader
+from seismic import SegyLoader, build_seismic_info, get_trace_header_dataframe
 
 loader = SegyLoader('seismic_data.sgy')
 loader.load_data()
 
+info = build_seismic_info(loader)
+
 # Text and binary headers
-print(loader.get_text_header())
+print(loader.text_header)
 print(loader.binary_header)
 
 # Survey geometry
-print(f"Inlines    : {loader.n_inlines}")
-print(f"Crosslines : {loader.n_crosslines}")
+print(f"Inlines    : {info.n_inlines}")
+print(f"Crosslines : {info.n_crosslines}")
 
 # Trace headers as DataFrame
-df = loader.get_trace_header_dataframe()
+df = get_trace_header_dataframe(loader)
 print(df.head())
 ```
 
@@ -477,9 +481,9 @@ viewer.export_figure('section.png', dpi=300)      # Export
 loader = SegyLoader('large_survey.sgy')
 loader.load_data()                          # chunked internally
 
-inline_data = loader.get_inline(100)        # Extract inline 100
-xline_data  = loader.get_crossline(200)     # Extract crossline 200
-timeslice   = loader.get_timeslice(300)     # Extract time slice at 300 ms
+inline_data = loader.data[100, :, :]        # Extract inline 100
+xline_data  = loader.data[:, 200, :]        # Extract crossline 200
+timeslice   = loader.data[:, :, 300]        # Extract time slice at 300 ms
 ```
 
 <br/>
@@ -499,7 +503,7 @@ vel_interp = RegularGridInterpolator(
 
 for il in range(n_inlines):
     for xl in range(n_crosslines):
-        trace       = seismic_loader.get_trace(il, xl)
+        trace       = seismic_loader.data[il, xl, :]
         depth_trace = convert_time_to_depth(trace, velocity)
 ```
 

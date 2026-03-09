@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 # Import SeisLab modules
 from seismic.segy_loader import SegyLoader
+from seismic.seismic_info import build_seismic_info
 from attributes.rms import RMSAmplitude, Energy
 from attributes.instantaneous import (InstantaneousAmplitude, 
                                       InstantaneousPhase,
@@ -26,14 +27,14 @@ def example_1_load_and_visualize():
     loader.load_data()
     
     # Get data info
-    info = loader.get_info()
+    info = build_seismic_info(loader)
     print(f"Loaded data:")
-    print(f"  Inlines: {info['n_inlines']}")
-    print(f"  Crosslines: {info['n_crosslines']}")
-    print(f"  Samples: {info['n_samples']}")
+    print(f"  Inlines: {info.n_inlines}")
+    print(f"  Crosslines: {info.n_crosslines}")
+    print(f"  Samples: {info.n_samples}")
     
     # Get inline section
-    inline_data = loader.get_inline(25)
+    inline_data = loader.data[25, :, :]
     
     # Visualize
     plt.figure(figsize=(10, 6))
@@ -56,7 +57,7 @@ def example_2_compute_attributes():
     # Load data
     loader = SegyLoader("synthetic_data.sgy")
     loader.load_data()
-    inline_data = loader.get_inline(25)
+    inline_data = loader.data[25, :, :]
     
     # Compute RMS amplitude
     rms_calc = RMSAmplitude(window_size=25)
@@ -111,7 +112,7 @@ def example_3_apply_filters():
     # Load data
     loader = SegyLoader("synthetic_data.sgy")
     loader.load_data()
-    inline_data = loader.get_inline(25)
+    inline_data = loader.data[25, :, :]
     
     # Apply bandpass filter
     bp_filter = BandpassFilter(lowcut=10, highcut=60, sample_rate=500)
@@ -156,7 +157,7 @@ def example_4_ml_classification():
     # Load data
     loader = SegyLoader("synthetic_data.sgy")
     loader.load_data()
-    inline_data = loader.get_inline(25)
+    inline_data = loader.data[25, :, :]
     
     # Classify using multiple attributes
     facies_map = classify_seismic_facies(
@@ -199,7 +200,7 @@ def example_5_single_trace_analysis():
     loader.load_data()
     
     # Get single trace
-    trace = loader.get_trace(25, 25)
+    trace = loader.data[25, 25, :]
     
     # Compute attributes for single trace
     rms_calc = RMSAmplitude(window_size=25)

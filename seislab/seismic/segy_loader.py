@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 
 import numpy as np
 import segyio
@@ -14,6 +15,7 @@ class SegyLoader:
 
     def __init__(self, filepath):
         self.filepath = filepath
+        self.path = Path(filepath)
         self.data = None
 
         self.inlines = None
@@ -28,6 +30,9 @@ class SegyLoader:
 
         self.geometry_info = {}
         self.header_info = {}
+        self.text_header = ""
+        self.binary_header = {}
+        self.synthetic_reason = ""
         self.load_report = "No data loaded."
 
     # ---------------------------------------------------
@@ -35,6 +40,10 @@ class SegyLoader:
     # ---------------------------------------------------
 
     def load_data(self):
+        if not self.path.exists():
+            self._load_synthetic(f"File not found: {self.filepath}")
+            return
+
         ext = os.path.splitext(self.filepath)[1].lower()
         if ext in {".nc", ".nc4", ".cdf", ".netcdf"}:
             self._load_netcdf()
@@ -42,6 +51,7 @@ class SegyLoader:
             self._load_segy()
 
     def _load_segy(self):
+        self.synthetic_reason = ""
         with segyio.open(self.filepath, ignore_geometry=True) as segy_file:
             self.n_samples = len(segy_file.samples)
 
@@ -58,14 +68,21 @@ class SegyLoader:
 
             self._build_cube(traces, il, xl)
             self.header_info = self.load_segy_headers(segy_file)
+            self.text_header = self.header_info.get("text_header", "")
+            self.binary_header = self.header_info.get("binary_header", {})
 
         self.source_format = "SEGY"
-        self.load_report = self._build_load_report()
+        if __package__:
+            from .seismic_info import build_load_report
+        else:
+            from seismic_info import build_load_report
+        self.load_report = build_load_report(self)
 
     def _load_netcdf(self):
         if Dataset is None:
             raise ImportError("netCDF4 is required to load .nc/.nc4/.cdf files.")
 
+        self.synthetic_reason = ""
         with Dataset(self.filepath, "r") as ds:
             data_var_name = self._pick_netcdf_data_variable(ds)
             if not data_var_name:
@@ -81,7 +98,7 @@ class SegyLoader:
             self.geometry_info = {}
 
             if raw_data.ndim == 2:
-                self.data = raw_data[np.newaxis, :, :]
+                self.data = raw_data[:, np.newaxis, :]
             elif raw_data.ndim == 3:
                 netcdf_geometry = self._detect_netcdf_trace_geometry(ds, raw_data)
                 if netcdf_geometry is not None:
@@ -128,9 +145,15 @@ class SegyLoader:
                     "source": "netcdf",
                 }
             self.header_info = self._load_netcdf_headers(ds, data_var_name)
+            self.text_header = self.header_info.get("text_header", "")
+            self.binary_header = self.header_info.get("binary_header", {})
 
         self.source_format = "NETCDF"
-        self.load_report = self._build_load_report()
+        if __package__:
+            from .seismic_info import build_load_report
+        else:
+            from seismic_info import build_load_report
+        self.load_report = build_load_report(self)
 
     # ---------------------------------------------------
     # GEOMETRY / HEADERS
@@ -375,9 +398,9 @@ class SegyLoader:
         if len(unique_il) <= 1 or len(unique_xl) <= 1:
             self.is_2d = True
             self.mode = "2d"
-            self.data = traces[np.newaxis, :, :]
-            self.inlines = np.array([0], dtype=np.int64)
-            self.crosslines = np.arange(traces.shape[0], dtype=np.int64)
+            self.data = traces[:, np.newaxis, :]
+            self.inlines = np.arange(traces.shape[0], dtype=np.int64)
+            self.crosslines = np.array([0], dtype=np.int64)
             return
 
         self.mode = "3d"
@@ -459,128 +482,71 @@ class SegyLoader:
                     pass
         return np.arange(expected_size, dtype=np.int64)
 
-    # ---------------------------------------------------
-    # REPORTING
-    # ---------------------------------------------------
-
-    def _friendly_dim_name(self, header_field, axis):
-        if axis == 0:
-            mapping = {
-                "TRACE_SEQUENCE_FILE": "FieldRecord",
-                "FieldRecord": "FieldRecord",
-                "INLINE_3D": "Inline",
-                "CDP": "CDP",
-            }
+    def _load_synthetic(self, reason):
+        if __package__:
+            from .seismic_info import build_load_report
         else:
-            mapping = {
-                "TRACE_SEQUENCE_LINE": "ReceiverID",
-                "TraceNumber": "ReceiverID",
-                "CROSSLINE_3D": "Crossline",
-                "CDP_TRACE": "CDP_TRACE",
-            }
-        return mapping.get(header_field, header_field)
+            from seismic_info import build_load_report
 
-    def _build_load_report(self):
-        if self.data is None:
-            return "No data loaded."
+        rng = np.random.default_rng(42)
 
-        lines = []
-        lines.append("detect_geometry()")
+        n_inlines = 50
+        n_crosslines = 50
+        n_samples = 500
+        sample_rate_ms = 2.0
 
-        pair = self.geometry_info.get("selected_pair", ("Inline", "Crossline"))
-        pair_a, pair_b = pair[0], pair[1]
+        cube = np.zeros((n_inlines, n_crosslines, n_samples), dtype=np.float32)
+        time_axis = np.arange(n_samples, dtype=np.float32)
 
-        lines.append(f"|- source: {self.geometry_info.get('source', 'unknown')}")
-        lines.append(f"|- selected headers: {pair_a} x {pair_b}")
-        lines.append(
-            f"|- dimensions: {self.geometry_info.get('n_inlines', self.data.shape[0])} x "
-            f"{self.geometry_info.get('n_crosslines', self.data.shape[1])}"
-        )
-        lines.append(
-            f"|- traces: {self.geometry_info.get('trace_count', int(np.prod(self.data.shape[:2])))} "
-            f"(fill ratio {self.geometry_info.get('fill_ratio', 1.0):.3f})"
-        )
+        event_times = (80, 150, 250, 350, 420)
+        event_amplitudes = (1.2, 0.8, 1.5, 0.6, 1.0)
+        event_frequencies = (20.0, 25.0, 30.0, 22.0, 28.0)
 
-        lines.append("")
-        lines.append("load_segy_headers()")
+        for il_idx in range(n_inlines):
+            for xl_idx in range(n_crosslines):
+                dip_x = int(il_idx * 0.3)
+                dip_y = int(xl_idx * 0.2)
+                amplitude_var = 0.8 + 0.4 * np.sin(il_idx / 10.0) * np.cos(xl_idx / 8.0)
 
-        text_header = self.header_info.get("text_header") or ""
-        if text_header:
-            lines.append(text_header)
+                trace = np.zeros(n_samples, dtype=np.float32)
+                for event_time, amplitude, frequency in zip(
+                    event_times,
+                    event_amplitudes,
+                    event_frequencies,
+                ):
+                    shifted = time_axis - (event_time + dip_x + dip_y)
+                    trace += amplitude_var * amplitude * self._ricker_wavelet(shifted, frequency, sample_rate_ms)
 
-        if self.source_format == "NETCDF":
-            dims = self.header_info.get("dimensions", [])
-            vars_list = self.header_info.get("variables", [])
-            groups = self.header_info.get("groups", [])
-            if self.geometry_info.get("source") == "netcdf_headers":
-                dim_a = self._friendly_dim_name(pair_a, axis=0)
-                dim_b = self._friendly_dim_name(pair_b, axis=1)
-                dims_text = (
-                    f"{dim_a}({self.data.shape[0]}), "
-                    f"{dim_b}({self.data.shape[1]}), "
-                    f"Time({self.data.shape[2]})"
-                )
-            else:
-                dims_text = ", ".join(f"{name}({size})" for name, size in dims) if dims else "-"
-            vars_text = ", ".join(vars_list) if vars_list else "-"
-            groups_text = ", ".join(groups) if groups else "-"
-        else:
-            dim_a = self._friendly_dim_name(pair_a, axis=0)
-            dim_b = self._friendly_dim_name(pair_b, axis=1)
-            dims_text = f"{dim_a}({self.data.shape[0]}), {dim_b}({self.data.shape[1]}), Time({self.data.shape[2]})"
+                trace += rng.normal(0.0, 0.08, n_samples).astype(np.float32)
+                cube[il_idx, xl_idx, :] = trace
 
-            trace_fields = self.header_info.get("trace_header_fields", [])
-            variables = [f"float32 Samples({dim_a}, {dim_b}, Time)", "float32 Time(Time)"]
-            variables.extend(f"int32 {field}({dim_a}, {dim_b})" for field in trace_fields)
-            vars_text = ", ".join(variables)
-            groups_text = "-"
-
-        lines.append(f"dimensions(sizes): {dims_text}")
-        lines.append(f"variables(dimensions): {vars_text}")
-        lines.append(f"groups: {groups_text}")
-
-        binary_header = self.header_info.get("binary_header")
-        if isinstance(binary_header, dict) and binary_header:
-            bin_text = ", ".join(f"{k}: {v}" for k, v in binary_header.items())
-            lines.append(f"bin: {{{bin_text}}}")
-        elif binary_header:
-            lines.append(f"bin: {binary_header}")
-
-        lines.append(f"Data shape: {tuple(int(v) for v in self.data.shape)}")
-        return "\n".join(lines)
-
-    # ---------------------------------------------------
-    # DATA ACCESS
-    # ---------------------------------------------------
-
-    def get_inline(self, i):
-        return self.data[i, :, :]
-
-    def get_crossline(self, x):
-        return self.data[:, x, :]
-
-    def get_timeslice(self, t):
-        return self.data[:, :, t]
-
-    def get_trace(self, i, x):
-        return self.data[i, x, :]
-
-    # ---------------------------------------------------
-    # INFO
-    # ---------------------------------------------------
-
-    def get_info(self):
-        return {
-            "filepath": self.filepath,
-            "mode": self.mode,
-            "is_2d": self.is_2d,
-            "format": self.source_format,
-            "n_inlines": int(self.data.shape[0]) if self.data is not None else 0,
-            "n_crosslines": int(self.data.shape[1]) if self.data is not None else 0,
-            "n_samples": int(self.data.shape[2]) if self.data is not None else 0,
-            "sample_rate": float(self.sample_rate),
-            "data_min": float(np.min(self.data)) if self.data is not None else 0.0,
-            "data_max": float(np.max(self.data)) if self.data is not None else 0.0,
-            "load_report": self.load_report,
-            "geometry_info": self.geometry_info,
+        self.data = cube
+        self.inlines = np.arange(n_inlines, dtype=np.int64)
+        self.crosslines = np.arange(n_crosslines, dtype=np.int64)
+        self.n_samples = n_samples
+        self.sample_rate = sample_rate_ms
+        self.mode = "3d"
+        self.is_2d = False
+        self.source_format = "SYNTHETIC"
+        self.synthetic_reason = reason
+        self.geometry_info = {
+            "selected_pair": ("Inline", "Crossline"),
+            "n_inlines": n_inlines,
+            "n_crosslines": n_crosslines,
+            "trace_count": n_inlines * n_crosslines,
+            "fill_ratio": 1.0,
+            "source": "synthetic",
         }
+        self.header_info = {
+            "text_header": "",
+            "binary_header": {},
+            "trace_header_fields": [],
+        }
+        self.text_header = ""
+        self.binary_header = {}
+        self.load_report = build_load_report(self)
+
+    def _ricker_wavelet(self, t_samples, frequency_hz, sample_rate_ms):
+        t_seconds = np.asarray(t_samples, dtype=np.float32) * (sample_rate_ms / 1000.0)
+        arg = np.pi * frequency_hz * t_seconds
+        return (1.0 - 2.0 * arg * arg) * np.exp(-(arg * arg))
