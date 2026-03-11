@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QApplication, QSplashScreen
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt, QTimer
 
-from gui.main_window import SeisLabApp
+from gui.separate_gui_for_seismic import SeisLabApp
 
 
 def main():

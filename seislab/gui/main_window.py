@@ -712,7 +712,7 @@ class CoordDisplay(QWidget):
 #  Main Application Window
 # ─────────────────────────────────────────────
 class SeisLabApp(QMainWindow):
-    """Main application window for SeisLab — Professional Edition."""
+    """Main application window for SeismoForge — Professional Edition."""
 
     def __init__(self):
         super().__init__()
@@ -740,7 +740,7 @@ class SeisLabApp(QMainWindow):
     #  UI CONSTRUCTION
     # ──────────────────────────────────────────
     def setup_ui(self):
-        self.setWindowTitle("SeisLab Pro  ·  Seismic Analysis & Interpretation Workstation")
+        self.setWindowTitle("SeismoForge  ·  Seismic Analysis & Interpretation Workstation")
         self.setGeometry(60, 40, 1920, 1060)
         self.setMinimumSize(1280, 720)
 
@@ -1220,7 +1220,7 @@ class SeisLabApp(QMainWindow):
 
         # Help
         help_m = mb.addMenu("Help")
-        self.action_about = QAction("About SeisLab Pro", self)
+        self.action_about = QAction("About SeismoForge", self)
         self.action_docs  = QAction("Documentation", self)
         for a in [self.action_docs, None, self.action_about]:
             if a is None: help_m.addSeparator()
@@ -1882,12 +1882,12 @@ class SeisLabApp(QMainWindow):
                 QMessageBox.critical(self, "Export Error", f"Export failed:\n{e}")
 
     def show_about(self):
-        QMessageBox.about(self, "About SeisLab Pro",
-                          "<h3>SeisLab Pro Workstation</h3>"
+        QMessageBox.about(self, "About SeismoForge",
+                          "<h3>SeismoForge Workstation</h3>"
                           "<p><b>Version 2.0</b>  ·  Professional Seismic Analysis Environment</p>"
                           "<p>Features: orthogonal slicing, time ↔ depth conversion, "
                           "attribute extraction, processing workflows, ML classification.</p>"
-                          "<p style='color:#888'>© 2025 SeisLab Team</p>")
+                          "<p style='color:#888'>© 2025 SeismoForge Team</p>")
 
     # ──────────────────────────────────────────
     #  THEME

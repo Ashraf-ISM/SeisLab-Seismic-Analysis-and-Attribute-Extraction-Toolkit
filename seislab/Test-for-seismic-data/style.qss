@@ -1,0 +1,44 @@
+QMainWindow, QWidget {
+    background-color: #F8F9FA;
+    font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+    color: #212529;
+}
+
+QDockWidget {
+    border: 1px solid #DEE2E6;
+    font-weight: bold;
+}
+
+QDockWidget::title {
+    background: #E9ECEF;
+    padding: 6px;
+    border-bottom: 1px solid #DEE2E6;
+}
+
+QPushButton {
+    background-color: #0D6EFD;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #0B5ED7;
+}
+
+QPushButton:pressed {
+    background-color: #0A58CA;
+}
+
+QComboBox, QSpinBox {
+    border: 1px solid #CED4DA;
+    border-radius: 4px;
+    padding: 5px;
+    background-color: #FFFFFF;
+}
+
+QComboBox::drop-down {
+    border-left: 1px solid #CED4DA;
+}
