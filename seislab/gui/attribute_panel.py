@@ -9,7 +9,6 @@ Design: Professional light-theme geoscience workstation (Petrel / Kingdom style)
 """
 
 import os
-import inspect
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -276,10 +275,9 @@ def _attribute_compute_kwargs(window_size: int) -> dict:
     win = int(window_size)
     win_traces = max(3, min(21, (win // 4) | 1))
     return {
-        "window_samples": win,
-        "window_traces":  win_traces,
-        "sigma_samples":  max(0.75, float(win) / 10.0),
-        "sigma_traces":   max(0.75, float(win_traces) / 6.0),
+        "window": win,
+        "ws":     win_traces,
+        "wt":     win,
     }
 
 
@@ -936,70 +934,45 @@ class AttributePanel(QWidget):
                                 "No seismic section is loaded.\n"
                                 "Please open a SEG-Y file first.")
             return
-        # self.compute_attribute(name, self.input_data,
-                            #    sample_rate_ms=self.sample_rate_ms,
-                            #    sample_axis=self.sample_axis)
-        self.compute_attribute(self.input_data, name, sample_axis=self.sample_axis, window_size=self.window_size)
+        self.compute_attribute(
+            name,
+            self.input_data,
+            sample_rate_ms=self.sample_rate_ms,
+            sample_axis=self.sample_axis,
+            window_size=self.window_spin.value(),
+        )
 
-    # def compute_attribute(self, attribute_name, data,
-    #                       sample_rate_ms=None, sample_axis=1):
-    #     if data is None:
-    #         QMessageBox.warning(self, "No Data", "No seismic data available.")
-    #         return
+    def compute_attribute(self, attribute_name, data,
+                          sample_rate_ms=None, sample_axis=1, window_size=None):
+        if data is None:
+            QMessageBox.warning(self, "No Data", "No seismic data available.")
+            return
 
-    #     self.input_data  = data
-    #     self.sample_axis = 1 if sample_axis == 1 else 0
-    #     if sample_rate_ms is not None:
-    #         self.sample_rate_ms = float(sample_rate_ms)
+        self.input_data  = data
+        self.sample_axis = 1 if sample_axis == 1 else 0
+        if sample_rate_ms is not None:
+            self.sample_rate_ms = float(sample_rate_ms)
 
-    #     attribute_name = self._canonical(attribute_name)
+        attribute_name = self._canonical(attribute_name)
+        if window_size is None:
+            window_size = self.window_spin.value() if hasattr(self, "window_spin") else 25
 
-    #     self.progress.setVisible(True)
-    #     self.progress.setRange(0, 0)
-    #     self.btn_compute.setEnabled(False)
-    #     self.status_badge.set_state("working")
-    #     self.title_label.setText(f"Computing {attribute_name}…")
-    #     self.cmap_chip.setVisible(False)
+        self.progress.setVisible(True)
+        self.progress.setRange(0, 0)
+        self.btn_compute.setEnabled(False)
+        self.status_badge.set_state("working")
+        self.title_label.setText(f"Computing {attribute_name}…")
+        self.cmap_chip.setVisible(False)
 
-    #     self._thread = AttributeComputeThread(
-    #         data, attribute_name,
-    #         window_size=self.window_spin.value(),
-    #         sample_rate_ms=self.sample_rate_ms,
-    #         sample_axis=self.sample_axis,
-    #     )
-    #     self._thread.finished.connect(self._on_finished)
-    #     self._thread.error.connect(self._on_error)
-    #     self._thread.start()
-   
-       
-
-
-    def compute_attribute(self, data, attribute_name, sample_axis=0, **kwargs):
-    
-        key = attribute_name.replace("_"," ").lower().strip()
-    
-        if key not in self._dispatch:
-            raise ValueError(f"Unknown attribute: {attribute_name}")
-    
-        func = self._dispatch[key]
-    
-        # Get function parameters
-        sig = inspect.signature(func)
-    
-        # Keep only valid kwargs
-        valid_kwargs = {
-            k: v for k, v in kwargs.items()
-            if k in sig.parameters
-        }
-    
-        if data.ndim == 2:
-            return func(data, **valid_kwargs)
-    
-        elif data.ndim == 3:
-            return self._compute_3d(data, func, **valid_kwargs)
-    
-        else:
-            raise ValueError("Input must be 2D or 3D seismic data")
+        self._thread = AttributeComputeThread(
+            data, attribute_name,
+            window_size=window_size,
+            sample_rate_ms=self.sample_rate_ms,
+            sample_axis=self.sample_axis,
+        )
+        self._thread.finished.connect(self._on_finished)
+        self._thread.error.connect(self._on_error)
+        self._thread.start()
     
     # ─────────────────────────────────────────────────────────────────────
     #  Thread callbacks

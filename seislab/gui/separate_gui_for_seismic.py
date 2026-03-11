@@ -323,7 +323,6 @@ QSlider::groove:horizontal {{
 QSlider::handle:horizontal {{
     background:{C['accent']}; border:2px solid {C['bg_white']};
     width:14px; height:14px; border-radius:7px; margin:-5px 0;
-    box-shadow: 0 1px 3px rgba(37,99,235,0.4);
 }}
 QSlider::sub-page:horizontal {{ background:{C['accent']}; border-radius:2px; }}
 

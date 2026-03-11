@@ -1,3 +1,4 @@
+import inspect
 import numpy as np
 from scipy.signal import hilbert
 from scipy.ndimage import (
@@ -56,26 +57,28 @@ class SeismicAttributes:
     #         raise ValueError("Data must be 2D or 3D")
         
     def compute_attribute(self, data, attribute_name, sample_axis=0, **kwargs):
-     
-     """
-     GUI-compatible dispatcher for attribute computation.
-     """
-    
-     key = attribute_name.lower().strip()
-    
-     if key not in self._dispatch:
-         raise ValueError(f"Unknown attribute: {attribute_name}")
-     
-     func = self._dispatch[key]
-    
-     if data.ndim == 2:
-         return func(data, **kwargs)
-    
-     elif data.ndim == 3:
-         return self._compute_3d(data, func, **kwargs)
-    
-     else:
-         raise ValueError("Input must be 2D or 3D seismic data")
+
+        """
+        GUI-compatible dispatcher for attribute computation.
+        """
+
+        key = attribute_name.lower().strip()
+
+        if key not in self._dispatch:
+            raise ValueError(f"Unknown attribute: {attribute_name}")
+
+        func = self._dispatch[key]
+        sig = inspect.signature(func)
+        valid_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+
+        if data.ndim == 2:
+            return func(data, **valid_kwargs)
+
+        elif data.ndim == 3:
+            return self._compute_3d(data, func, **valid_kwargs)
+
+        else:
+            raise ValueError("Input must be 2D or 3D seismic data")
 
     # -------------------------------------------------
     # HANDLE 3D CUBES
