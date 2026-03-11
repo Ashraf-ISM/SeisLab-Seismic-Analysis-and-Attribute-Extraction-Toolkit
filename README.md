@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:020818,30:061428,70:0a2244,100:0d3060&height=280&section=header&text=SeisLab&fontSize=100&fontColor=38bdf8&fontAlignY=44&desc=Professional%20Seismic%20Analysis%20and%20SEG-Y%20Interpretation%20Toolkit&descSize=18&descAlignY=64&descColor=4a7a9b&animation=fadeIn&fontFamily=Trebuchet+MS" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:020818,30:061428,70:0a2244,100:0d3060&height=280&section=header&text=SeismoForge&fontSize=100&fontColor=38bdf8&fontAlignY=44&desc=Professional%20Seismic%20Analysis%20and%20SEG-Y%20Interpretation%20Toolkit&descSize=18&descAlignY=64&descColor=4a7a9b&animation=fadeIn&fontFamily=Trebuchet+MS" width="100%"/>
 
 </div>
 
